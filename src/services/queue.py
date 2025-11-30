@@ -137,6 +137,20 @@ class QueueManager:
                 error=str(e),
             )
             return False
+    
+    async def get_all_in_queue(self) -> list[int]:
+        """
+        Get all user IDs currently in the queue.
+        
+        Returns:
+            List of user IDs in the queue
+        """
+        try:
+            queue_items = await self.redis.lrange(self.QUEUE_KEY, 0, -1)
+            return [int(user_id) for user_id in queue_items]
+        except Exception as e:
+            logger.error("queue_get_all_error", error=str(e))
+            return []
 
 
 class QueueFullError(Exception):

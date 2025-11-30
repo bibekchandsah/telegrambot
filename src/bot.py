@@ -13,6 +13,7 @@ from src.config import Config
 from src.db.redis_client import redis_client
 from src.services.matching import MatchingEngine
 from src.services.profile import ProfileManager
+from src.services.preferences import PreferenceManager
 from src.handlers.commands import (
     start_command,
     help_command,
@@ -27,9 +28,15 @@ from src.handlers.commands import (
     country_callback,
     country_text,
     cancel_profile,
+    preferences_command,
+    pref_gender_callback,
+    pref_country_text,
+    cancel_preferences,
     NICKNAME,
     GENDER,
     COUNTRY,
+    PREF_GENDER,
+    PREF_COUNTRY,
 )
 from src.handlers.messages import (
     handle_message,
@@ -48,10 +55,20 @@ async def post_init(application: Application):
         # Connect to Redis
         await redis_client.connect()
         
+        # Initialize managers
+        profile_manager = ProfileManager(redis_client)
+        preference_manager = PreferenceManager(redis_client)
+        matching_engine = MatchingEngine(
+            redis_client,
+            profile_manager=profile_manager,
+            preference_manager=preference_manager,
+        )
+        
         # Store instances in bot_data for access in handlers
         application.bot_data["redis"] = redis_client
-        application.bot_data["matching"] = MatchingEngine(redis_client)
-        application.bot_data["profile_manager"] = ProfileManager(redis_client)
+        application.bot_data["matching"] = matching_engine
+        application.bot_data["profile_manager"] = profile_manager
+        application.bot_data["preference_manager"] = preference_manager
         
         logger.info("bot_initialized", bot_username=application.bot.username)
         
@@ -154,6 +171,24 @@ def main():
             fallbacks=[CommandHandler("cancel", cancel_profile)],
         )
         application.add_handler(profile_conv_handler)
+        
+        # Register preferences conversation handler
+        preferences_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("preferences", preferences_command)],
+            states={
+                PREF_GENDER: [
+                    CallbackQueryHandler(
+                        pref_gender_callback,
+                        pattern="^pref_(gender|country|reset|cancel|back|gender_male|gender_female|gender_any)$",
+                    )
+                ],
+                PREF_COUNTRY: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, pref_country_text),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_preferences)],
+        )
+        application.add_handler(preferences_conv_handler)
         
         # Register message handler for routing
         # This handles all non-command messages

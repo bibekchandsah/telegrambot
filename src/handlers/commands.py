@@ -11,6 +11,12 @@ from src.services.profile import (
     GENDERS,
     COUNTRIES,
 )
+from src.services.preferences import (
+    PreferenceManager,
+    validate_gender_filter,
+    validate_country_filter,
+    GENDER_FILTERS,
+)
 from src.utils.decorators import rate_limit
 from src.utils.logger import get_logger
 
@@ -18,6 +24,9 @@ logger = get_logger(__name__)
 
 # Conversation states for profile editing
 NICKNAME, GENDER, COUNTRY = range(3)
+
+# Conversation states for preferences
+PREF_GENDER, PREF_COUNTRY = range(3, 5)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -31,12 +40,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📋 **Commands:**\n"
         "/profile - View your profile\n"
         "/editprofile - Create/edit your profile\n"
+        "/preferences - Set matching filters\n"
         "/chat - Start searching for a partner\n"
         "/stop - End current chat\n"
         "/next - Skip to next partner\n"
         "/help - Show help message\n\n"
         "🔒 Your identity remains completely anonymous.\n"
         "💡 Create your profile first with /editprofile!\n"
+        "⚙️ Customize matching with /preferences!\n"
         "Ready to start? Use /chat to find a partner!"
     )
     
@@ -56,14 +67,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   • Choose a nickname\n"
         "   • Select your gender\n"
         "   • Pick your country\n\n"
-        "2️⃣ Use /chat to enter the waiting queue\n"
-        "3️⃣ Once matched, start chatting with your partner\n"
-        "4️⃣ Send text, photos, videos, stickers, voice notes\n"
-        "5️⃣ Use /next to skip to a new partner\n"
-        "6️⃣ Use /stop to end the chat\n\n"
+        "2️⃣ Set matching preferences with /preferences\n"
+        "   • Filter by gender (Male/Female/Any)\n"
+        "   • Filter by country (specific or Any)\n\n"
+        "3️⃣ Use /chat to enter the waiting queue\n"
+        "4️⃣ Once matched, start chatting with your partner\n"
+        "5️⃣ Send text, photos, videos, stickers, voice notes\n"
+        "6️⃣ Use /next to skip to a new partner\n"
+        "7️⃣ Use /stop to end the chat\n\n"
         "📋 **All Commands:**\n"
         "/profile - View your profile\n"
         "/editprofile - Edit your profile\n"
+        "/preferences - Set matching filters\n"
         "/chat - Find a partner\n"
         "/stop - End chat\n"
         "/next - Skip to next\n"
@@ -90,6 +105,7 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /chat command - join queue and find partner."""
     user_id = update.effective_user.id
     matching: MatchingEngine = context.bot_data["matching"]
+    preference_manager: PreferenceManager = context.bot_data.get("preference_manager")
     
     try:
         # Check current state
@@ -109,10 +125,17 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
+        # Check if user has custom preferences set
+        has_preferences = False
+        if preference_manager:
+            has_preferences = await preference_manager.has_preferences(user_id)
+        
         # Try to find a partner
-        await update.message.reply_text(
-            "🔍 Looking for a partner..."
-        )
+        search_msg = "🔍 Looking for a partner..."
+        if not has_preferences:
+            search_msg += "\n\n💡 Tip: Use /preferences to filter matches by gender or country!"
+        
+        await update.message.reply_text(search_msg)
         
         partner_id = await matching.find_partner(user_id)
         
@@ -685,3 +708,243 @@ async def cancel_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     logger.info("profile_editing_cancelled", user_id=update.effective_user.id)
     return ConversationHandler.END
+
+
+# ============ PREFERENCES COMMANDS ============
+
+
+async def preferences_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle /preferences command - show and edit matching preferences.
+    Entry point for preferences conversation.
+    """
+    user_id = update.effective_user.id
+    preference_manager: PreferenceManager = context.bot_data.get("preference_manager")
+    
+    if not preference_manager:
+        await update.message.reply_text(
+            "❌ Preference system is not available. Please try again later."
+        )
+        return ConversationHandler.END
+    
+    try:
+        # Get current preferences
+        preferences = await preference_manager.get_preferences(user_id)
+        
+        # Show current preferences with edit options
+        keyboard = [
+            [
+                InlineKeyboardButton("🔄 Change Gender Filter", callback_data="pref_gender"),
+                InlineKeyboardButton("🌍 Change Country Filter", callback_data="pref_country"),
+            ],
+            [
+                InlineKeyboardButton("🔄 Reset to Defaults", callback_data="pref_reset"),
+                InlineKeyboardButton("❌ Cancel", callback_data="pref_cancel"),
+            ],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        message_text = (
+            f"{preferences.to_display()}\n\n"
+            "━━━━━━━━━━━━━━━\n"
+            "💡 Preferences help you find partners that match your criteria.\n"
+            "Choose what to change:"
+        )
+        
+        await update.message.reply_text(
+            message_text,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        
+        logger.info("preferences_shown", user_id=user_id)
+        return PREF_GENDER  # Wait for user choice
+        
+    except Exception as e:
+        logger.error("preferences_command_error", user_id=user_id, error=str(e))
+        await update.message.reply_text(
+            "❌ Failed to load preferences. Please try again."
+        )
+        return ConversationHandler.END
+
+
+async def pref_gender_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle gender filter selection callback."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    callback_data = query.data
+    
+    if callback_data == "pref_gender":
+        # Show gender filter options
+        keyboard = [
+            [
+                InlineKeyboardButton("👨 Male", callback_data="pref_gender_male"),
+                InlineKeyboardButton("👩 Female", callback_data="pref_gender_female"),
+            ],
+            [
+                InlineKeyboardButton("🧑 Any", callback_data="pref_gender_any"),
+            ],
+            [InlineKeyboardButton("⬅️ Back", callback_data="pref_back")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "👤 **Select Gender Filter:**\n\n"
+            "Choose the gender of partners you want to match with:",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        
+        return PREF_GENDER
+    
+    elif callback_data.startswith("pref_gender_"):
+        # User selected a gender filter
+        gender_map = {
+            "pref_gender_male": "Male",
+            "pref_gender_female": "Female",
+            "pref_gender_any": "Any",
+        }
+        
+        selected_gender = gender_map.get(callback_data)
+        if not selected_gender:
+            await query.edit_message_text("❌ Invalid selection. Use /preferences to try again.")
+            return ConversationHandler.END
+        
+        # Validate
+        is_valid, error_msg = validate_gender_filter(selected_gender)
+        if not is_valid:
+            await query.edit_message_text(f"❌ {error_msg}\nUse /preferences to try again.")
+            return ConversationHandler.END
+        
+        # Save preference
+        preference_manager: PreferenceManager = context.bot_data["preference_manager"]
+        try:
+            preferences = await preference_manager.set_preferences(
+                user_id=user_id,
+                gender_filter=selected_gender,
+            )
+            
+            gender_emoji = {"Male": "👨", "Female": "👩", "Any": "🧑"}
+            
+            await query.edit_message_text(
+                f"✅ Gender filter updated to: {gender_emoji.get(selected_gender, '🧑')} **{selected_gender}**\n\n"
+                f"{preferences.to_display()}\n\n"
+                "Use /preferences to change other settings or /chat to start matching!",
+                parse_mode="Markdown",
+            )
+            
+            logger.info("gender_filter_updated", user_id=user_id, gender=selected_gender)
+            return ConversationHandler.END
+            
+        except Exception as e:
+            logger.error("gender_filter_save_error", user_id=user_id, error=str(e))
+            await query.edit_message_text(
+                "❌ Failed to save gender filter. Use /preferences to try again."
+            )
+            return ConversationHandler.END
+    
+    elif callback_data == "pref_country":
+        # Move to country selection
+        await query.edit_message_text(
+            "🌍 **Country Filter**\n\n"
+            "Type the name of the country you want to match with (e.g., 'USA', 'India').\n"
+            "Or type 'Any' to match with anyone.\n\n"
+            "Use /cancel to cancel.",
+        )
+        return PREF_COUNTRY
+    
+    elif callback_data == "pref_reset":
+        # Reset to defaults
+        preference_manager: PreferenceManager = context.bot_data["preference_manager"]
+        try:
+            await preference_manager.delete_preferences(user_id)
+            
+            await query.edit_message_text(
+                "✅ Preferences reset to defaults!\n\n"
+                "🧑 Gender: Any\n"
+                "🌍 Country: Any\n\n"
+                "Use /preferences to set custom filters or /chat to start matching!"
+            )
+            
+            logger.info("preferences_reset", user_id=user_id)
+            return ConversationHandler.END
+            
+        except Exception as e:
+            logger.error("preferences_reset_error", user_id=user_id, error=str(e))
+            await query.edit_message_text(
+                "❌ Failed to reset preferences. Use /preferences to try again."
+            )
+            return ConversationHandler.END
+    
+    elif callback_data == "pref_cancel":
+        await query.edit_message_text(
+            "❌ Preferences editing cancelled.\n\n"
+            "Your current preferences remain unchanged.\n"
+            "Use /preferences anytime to change them."
+        )
+        logger.info("preferences_cancelled", user_id=user_id)
+        return ConversationHandler.END
+    
+    elif callback_data == "pref_back":
+        # Go back to main preferences menu
+        return await preferences_command(update, context)
+    
+    return ConversationHandler.END
+
+
+async def pref_country_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle country filter text input."""
+    user_id = update.effective_user.id
+    country = update.message.text.strip()
+    
+    # Validate country
+    is_valid, error_msg = validate_country_filter(country)
+    if not is_valid:
+        await update.message.reply_text(
+            f"❌ {error_msg}\n\n"
+            f"Please enter a valid country name or 'Any'.\n"
+            f"Use /cancel to cancel."
+        )
+        return PREF_COUNTRY
+    
+    # Save preference
+    preference_manager: PreferenceManager = context.bot_data["preference_manager"]
+    try:
+        preferences = await preference_manager.set_preferences(
+            user_id=user_id,
+            country_filter=country,
+        )
+        
+        country_emoji = "🌍" if country == "Any" else "📍"
+        
+        await update.message.reply_text(
+            f"✅ Country filter updated to: {country_emoji} **{country}**\n\n"
+            f"{preferences.to_display()}\n\n"
+            "Use /preferences to change other settings or /chat to start matching!",
+            parse_mode="Markdown",
+        )
+        
+        logger.info("country_filter_updated", user_id=user_id, country=country)
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error("country_filter_save_error", user_id=user_id, error=str(e))
+        await update.message.reply_text(
+            "❌ Failed to save country filter. Use /preferences to try again."
+        )
+        return ConversationHandler.END
+
+
+async def cancel_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel preferences editing."""
+    await update.message.reply_text(
+        "❌ Preferences editing cancelled.\n\n"
+        "You can start again with /preferences anytime."
+    )
+    
+    context.user_data.clear()
+    logger.info("preferences_editing_cancelled", user_id=update.effective_user.id)
+    return ConversationHandler.END
+

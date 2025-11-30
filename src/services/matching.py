@@ -11,13 +11,15 @@ logger = get_logger(__name__)
 class MatchingEngine:
     """Handles user pairing and chat state management."""
     
-    def __init__(self, redis: RedisClient):
+    def __init__(self, redis: RedisClient, profile_manager=None, preference_manager=None):
         self.redis = redis
         self.queue = QueueManager(redis)
+        self.profile_manager = profile_manager
+        self.preference_manager = preference_manager
     
     async def find_partner(self, user_id: int) -> Optional[int]:
         """
-        Find a chat partner for the user.
+        Find a chat partner for the user based on preferences.
         
         Returns:
             Partner ID if found, None if added to queue
@@ -36,15 +38,28 @@ class MatchingEngine:
             # Set user state to IN_QUEUE
             await self.set_user_state(user_id, "IN_QUEUE")
             
-            # Try to find a partner
-            partner_id = await self.queue.join_queue(user_id)
+            # Get user's profile and preferences for matching
+            user_profile = None
+            user_preferences = None
+            
+            if self.profile_manager:
+                user_profile = await self.profile_manager.get_profile(user_id)
+            
+            if self.preference_manager:
+                user_preferences = await self.preference_manager.get_preferences(user_id)
+            
+            # Try to find a compatible partner
+            partner_id = await self._find_compatible_partner(
+                user_id, user_profile, user_preferences
+            )
             
             if partner_id:
                 # Match found, create the pair
                 await self.create_pair(user_id, partner_id)
                 return partner_id
             
-            # No partner found, user is now waiting
+            # No compatible partner found, add to queue
+            await self.queue.join_queue(user_id)
             return None
             
         except Exception as e:
@@ -57,6 +72,122 @@ class MatchingEngine:
             await self.set_user_state(user_id, "IDLE")
             await self.queue.leave_queue(user_id)
             raise
+    
+    async def _find_compatible_partner(
+        self,
+        user_id: int,
+        user_profile,
+        user_preferences,
+    ) -> Optional[int]:
+        """
+        Find a compatible partner from the queue based on mutual preferences.
+        
+        Checks:
+        1. User's preferences match potential partner's profile
+        2. Potential partner's preferences match user's profile
+        
+        Returns:
+            Partner ID if compatible match found, None otherwise
+        """
+        try:
+            # Get all users in queue
+            queue_users = await self.queue.get_all_in_queue()
+            
+            if not queue_users:
+                return None
+            
+            # Try to find a compatible match
+            for potential_partner_id in queue_users:
+                if potential_partner_id == user_id:
+                    continue
+                
+                # Get potential partner's profile and preferences
+                partner_profile = None
+                partner_preferences = None
+                
+                if self.profile_manager:
+                    partner_profile = await self.profile_manager.get_profile(
+                        potential_partner_id
+                    )
+                
+                if self.preference_manager:
+                    partner_preferences = await self.preference_manager.get_preferences(
+                        potential_partner_id
+                    )
+                
+                # Check mutual compatibility
+                if await self._are_compatible(
+                    user_profile,
+                    user_preferences,
+                    partner_profile,
+                    partner_preferences,
+                ):
+                    # Remove partner from queue
+                    await self.queue.leave_queue(potential_partner_id)
+                    
+                    logger.info(
+                        "compatible_match_found",
+                        user_id=user_id,
+                        partner_id=potential_partner_id,
+                    )
+                    
+                    return potential_partner_id
+            
+            # No compatible match found
+            return None
+            
+        except Exception as e:
+            logger.error(
+                "find_compatible_partner_error",
+                user_id=user_id,
+                error=str(e),
+            )
+            return None
+    
+    async def _are_compatible(
+        self,
+        user_profile,
+        user_preferences,
+        partner_profile,
+        partner_preferences,
+    ) -> bool:
+        """
+        Check if two users are compatible based on mutual preferences.
+        
+        Returns:
+            True if both users match each other's preferences
+        """
+        # If profiles or preferences are missing, allow match (backwards compatibility)
+        if not user_profile or not partner_profile:
+            return True
+        
+        if not user_preferences or not partner_preferences:
+            return True
+        
+        # Check if user's preferences match partner's profile
+        # Gender filter
+        if user_preferences.gender_filter != "Any":
+            if partner_profile.gender != user_preferences.gender_filter:
+                return False
+        
+        # Country filter
+        if user_preferences.country_filter != "Any":
+            if partner_profile.country != user_preferences.country_filter:
+                return False
+        
+        # Check if partner's preferences match user's profile
+        # Gender filter
+        if partner_preferences.gender_filter != "Any":
+            if user_profile.gender != partner_preferences.gender_filter:
+                return False
+        
+        # Country filter
+        if partner_preferences.country_filter != "Any":
+            if user_profile.country != partner_preferences.country_filter:
+                return False
+        
+        # Both users match each other's preferences
+        return True
     
     async def create_pair(self, user1_id: int, user2_id: int):
         """
