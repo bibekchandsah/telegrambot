@@ -5,11 +5,14 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
+    ConversationHandler,
     filters,
 )
 from src.config import Config
 from src.db.redis_client import redis_client
 from src.services.matching import MatchingEngine
+from src.services.profile import ProfileManager
 from src.handlers.commands import (
     start_command,
     help_command,
@@ -17,6 +20,16 @@ from src.handlers.commands import (
     stop_command,
     next_command,
     report_command,
+    profile_command,
+    editprofile_command,
+    nickname_step,
+    gender_callback,
+    country_callback,
+    country_text,
+    cancel_profile,
+    NICKNAME,
+    GENDER,
+    COUNTRY,
 )
 from src.handlers.messages import (
     handle_message,
@@ -38,6 +51,7 @@ async def post_init(application: Application):
         # Store instances in bot_data for access in handlers
         application.bot_data["redis"] = redis_client
         application.bot_data["matching"] = MatchingEngine(redis_client)
+        application.bot_data["profile_manager"] = ProfileManager(redis_client)
         
         logger.info("bot_initialized", bot_username=application.bot.username)
         
@@ -121,6 +135,25 @@ def main():
         application.add_handler(CommandHandler("stop", stop_command))
         application.add_handler(CommandHandler("next", next_command))
         application.add_handler(CommandHandler("report", report_command))
+        application.add_handler(CommandHandler("profile", profile_command))
+        
+        # Register profile editing conversation handler
+        profile_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler("editprofile", editprofile_command),
+                CallbackQueryHandler(editprofile_command, pattern="^edit_profile$"),
+            ],
+            states={
+                NICKNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, nickname_step)],
+                GENDER: [CallbackQueryHandler(gender_callback, pattern="^gender_")],
+                COUNTRY: [
+                    CallbackQueryHandler(country_callback, pattern="^country_"),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, country_text),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_profile)],
+        )
+        application.add_handler(profile_conv_handler)
         
         # Register message handler for routing
         # This handles all non-command messages
