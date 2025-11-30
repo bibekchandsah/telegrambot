@@ -1,0 +1,169 @@
+1, Let users choose preferences before matching:
+    - Gender (Male / Female / Any)
+    - Country Filter (India / Nepal / Bangladesh / etc)
+
+2. Smart Queue System
+    - Estimated waiting time ("Searching… ⏳ Approx. 10 seconds")
+    - Priority queue for active users
+    - Match probability indicator
+    - Auto timeout + requeue
+
+3. Multi-Media Controls
+- User can choose privacy levels.
+    - Allow/disable images
+    - Allow/disable voice notes
+    - Allow/disable video
+    - Allow only text chats for safety
+
+4. Advanced Safety System
+    ✔ Report → Auto moderation
+        - 3 reports → temporary ban
+        - 5 reports → permanent ban
+
+5. Privacy & Anti-Stalker Features
+    - Unique session ID on every match
+    - Disable forwarding of messages
+    - Disable saving photos (Telegram API allows restricted permissions)
+
+6. Anonymous Feedback System
+    Users can rate their partner:
+        - 👍 Good
+        - 👎 Bad
+    Use this to:
+        - Improve matching
+        - Auto-limit toxic users
+
+7. User Profile (inside bot only, anonymous)
+- No real identity revealed.
+Profile contains:
+    - Nickname (not Telegram name)
+    - Gender
+    - Country
+    - Online status
+    - Rating ⭐
+
+✔ User can toggle:
+    - Anonymous Mode ON/OFF
+
+8. Message Features
+ - ✔ Typing Indicator
+    - Show “partner is typing…” using simulation.
+
+ - ✔ Online Status
+    - Partner online/offline indicator.
+
+ - ✔ Message Reactions
+    - ❤️ 😂 😮 👍 👎
+
+ - ✔ Quick Replies
+    - “Hi”
+    - “Where are you from?”
+    - “Tell me something interesting”
+
+9. Auto-Match Mode
+    - Once a chat ends → auto-queue for next partner.
+
+10. Anti-Bot System
+    - Detect bots or scripted spammers
+    - Ban instantly or warn
+
+11. Admin Dashboard (Web-Based)
+--------------------------------------------------
+1. User Management
+- Admin should be able to:
+    - View all registered users
+    - View online / active users
+    - View users currently in chat
+    - View users currently in queue
+    - Search users by:
+        - user ID
+        - username
+        - gender
+        - country
+    - View detailed user profile
+    - View chat history (if stored)
+
+2. Ban / Unban System
+- Admin should be able to:
+    - Ban user (temporary/permanent)
+    - Unban user
+    - Auto-ban from reports
+    - Add users to warning list
+    - Ban reasons:
+        - Nudity / explicit
+        - Spam
+        - Abuse
+        - Fake reports
+        - Harassment
+
+3. Matching Control
+- Admin should control:
+    - Turn matching on/off
+    - Enable/disable gender filter
+    - Enable/disable regional filter
+    - Clear/get current queue size
+    - Force match two specific users (debug)
+
+4. Live Monitoring
+- Admin must see:
+    - Current active chats (list of paired users)
+    - Queue length
+    - Server load (CPU/RAM)
+    - API response errors
+    - Failed message forwarding logs
+    - Usage heatmap by hour/time/day
+
+5. Report & Safety Management
+- Admin should manage:
+    - View all user reports
+    - Flags (Nudity, Harassment, Ad, Scam)
+    - Auto report scoring
+    - Approve/Reject user reports
+    - Freeze toxic users
+    - Block certain media types temporarily
+    - Add words to bad-word filter
+    - Real-time content moderation logs
+
+6. Broadcast Tools
+- Admin should broadcast message to:
+    - All users
+    - Online users
+    - Users with specific preferences (e.g., gender M, country India)
+    - Users who joined last 24 hours
+- Message types:
+    - Text
+    - Photo
+    - Buttons
+    - Inline menus
+    - Ads (if monetizing)
+
+7. Bot Configuration
+- Admin must be able to modify:
+    - Bot welcome message
+    - Match-found message
+    - Chat-end message
+- Rules
+    - Cooldown time after /next
+    - Inactivity auto-disconnect duration
+    - Allow/disallow:
+        - photos
+        - videos
+        - voice
+        - stickers
+        - location
+        - GIFs
+        - contact sharing
+- Also:
+    - Maintenance mode ON/OFF
+    - Disable new registrations
+    - Force logout of all users
+    - Reset whole queue
+
+
+
+Analytics:
+    - users online
+    - average chat duration
+    - messages per minute
+    - country stats
+    - gender distribution

@@ -1,0 +1,33 @@
+services:
+  - type: worker
+    name: telegram-chat-bot
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.bot
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: telegram-bot-redis
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MAX_QUEUE_SIZE
+        value: 500
+      - key: MESSAGE_RATE_LIMIT
+        value: 30
+      - key: CHAT_TIMEOUT
+        value: 600
+      - key: NEXT_COMMAND_LIMIT
+        value: 10
+    
+  - type: redis
+    name: telegram-bot-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
