@@ -16,6 +16,7 @@ from src.services.profile import ProfileManager
 from src.services.preferences import PreferenceManager
 from src.services.feedback import FeedbackManager
 from src.services.activity import ActivityManager
+from src.services.media_preferences import MediaPreferenceManager
 from src.handlers.commands import (
     start_command,
     help_command,
@@ -36,11 +37,14 @@ from src.handlers.commands import (
     cancel_preferences,
     feedback_callback,
     rating_command,
+    mediasettings_command,
+    media_callback,
     NICKNAME,
     GENDER,
     COUNTRY,
     PREF_GENDER,
     PREF_COUNTRY,
+    MEDIA_SETTINGS,
 )
 from src.handlers.messages import (
     handle_message,
@@ -64,6 +68,7 @@ async def post_init(application: Application):
         preference_manager = PreferenceManager(redis_client)
         feedback_manager = FeedbackManager(redis_client)
         activity_manager = ActivityManager(redis_client)
+        media_manager = MediaPreferenceManager(redis_client)
         matching_engine = MatchingEngine(
             redis_client,
             profile_manager=profile_manager,
@@ -78,6 +83,7 @@ async def post_init(application: Application):
         application.bot_data["preference_manager"] = preference_manager
         application.bot_data["feedback_manager"] = feedback_manager
         application.bot_data["activity_manager"] = activity_manager
+        application.bot_data["media_manager"] = media_manager
         
         logger.info("bot_initialized", bot_username=application.bot.username)
         
@@ -171,6 +177,21 @@ def main():
                 pattern="^feedback_(positive|negative|skip)$",
             )
         )
+        
+        # Register media settings conversation handler
+        media_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("mediasettings", mediasettings_command)],
+            states={
+                MEDIA_SETTINGS: [
+                    CallbackQueryHandler(
+                        media_callback,
+                        pattern="^media_(done|text_only_on|text_only_off|toggle_.+)$",
+                    )
+                ],
+            },
+            fallbacks=[],
+        )
+        application.add_handler(media_conv_handler)
         
         # Register profile editing conversation handler
         profile_conv_handler = ConversationHandler(

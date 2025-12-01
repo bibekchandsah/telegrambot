@@ -21,6 +21,10 @@ from src.services.feedback import (
     FeedbackManager,
     get_feedback_prompt,
 )
+from src.services.media_preferences import (
+    MediaPreferenceManager,
+    MediaPreferences,
+)
 from src.utils.decorators import rate_limit
 from src.utils.logger import get_logger
 
@@ -31,6 +35,9 @@ NICKNAME, GENDER, COUNTRY = range(3)
 
 # Conversation states for preferences
 PREF_GENDER, PREF_COUNTRY = range(3, 5)
+
+# Conversation states for media settings
+MEDIA_SETTINGS = 5
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -45,6 +52,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/profile - View your profile\n"
         "/editprofile - Create/edit your profile\n"
         "/preferences - Set matching filters\n"
+        "/mediasettings - Control media privacy\n"
         "/rating - View your rating\n"
         "/chat - Start searching for a partner\n"
         "/stop - End current chat\n"
@@ -76,16 +84,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "2️⃣ Set matching preferences with /preferences\n"
         "   • Filter by gender (Male/Female/Any)\n"
         "   • Filter by country (specific or Any)\n\n"
-        "3️⃣ Use /chat to enter the waiting queue\n"
-        "4️⃣ Once matched, start chatting with your partner\n"
-        "5️⃣ Send text, photos, videos, stickers, voice notes\n"
-        "6️⃣ Rate your partner after chatting (👍/👎)\n"
-        "7️⃣ Use /next to skip to a new partner\n"
-        "8️⃣ Use /stop to end the chat\n\n"
+        "3️⃣ Configure media privacy with /mediasettings\n"
+        "   • Control what media you receive\n"
+        "   • Enable text-only mode for safety\n\n"
+        "4️⃣ Use /chat to enter the waiting queue\n"
+        "5️⃣ Once matched, start chatting with your partner\n"
+        "6️⃣ Send text, photos, videos, stickers, voice notes\n"
+        "7️⃣ Rate your partner after chatting (👍/👎)\n"
+        "8️⃣ Use /next to skip to a new partner\n"
+        "9️⃣ Use /stop to end the chat\n\n"
         "📋 **All Commands:**\n"
         "/profile - View your profile\n"
         "/editprofile - Edit your profile\n"
         "/preferences - Set matching filters\n"
+        "/mediasettings - Media privacy settings\n"
         "/rating - View your rating\n"
         "/chat - Find a partner\n"
         "/stop - End chat\n"
@@ -1170,4 +1182,282 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ Failed to load rating. Please try again."
         )
+
+
+async def mediasettings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /mediasettings command - show media privacy settings."""
+    user_id = update.effective_user.id
+    media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
+    
+    if not media_manager:
+        await update.message.reply_text(
+            "❌ Media settings are not available."
+        )
+        return ConversationHandler.END
+    
+    try:
+        # Get current preferences
+        preferences = await media_manager.get_preferences(user_id)
+        
+        # Build settings message
+        settings_msg = "🎛️ **Media Privacy Settings**\n\n"
+        settings_msg += "Control what types of media you want to receive:\n\n"
+        
+        if preferences.text_only:
+            settings_msg += "🔒 **Text-Only Mode: ENABLED**\n"
+            settings_msg += "You only receive text messages.\n"
+        else:
+            settings_msg += "📷 Images: " + ("✅ Allowed" if preferences.allow_images else "❌ Blocked") + "\n"
+            settings_msg += "🎥 Videos: " + ("✅ Allowed" if preferences.allow_videos else "❌ Blocked") + "\n"
+            settings_msg += "🎤 Voice Notes: " + ("✅ Allowed" if preferences.allow_voice else "❌ Blocked") + "\n"
+            settings_msg += "🎵 Audio: " + ("✅ Allowed" if preferences.allow_audio else "❌ Blocked") + "\n"
+            settings_msg += "📎 Documents: " + ("✅ Allowed" if preferences.allow_documents else "❌ Blocked") + "\n"
+            settings_msg += "😀 Stickers: " + ("✅ Allowed" if preferences.allow_stickers else "❌ Blocked") + "\n"
+            settings_msg += "📹 Video Notes: " + ("✅ Allowed" if preferences.allow_video_notes else "❌ Blocked") + "\n"
+            settings_msg += "📍 Locations: " + ("✅ Allowed" if preferences.allow_locations else "❌ Blocked") + "\n"
+        
+        settings_msg += "\n💡 Tap a button to toggle a setting:"
+        
+        # Build keyboard
+        keyboard = []
+        
+        if preferences.text_only:
+            # Show only text-only toggle if enabled
+            keyboard.append([
+                InlineKeyboardButton("🔓 Disable Text-Only Mode", callback_data="media_text_only_off")
+            ])
+        else:
+            # Show all media type toggles
+            keyboard.extend([
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_images else '✅ Allow'} Images",
+                        callback_data="media_toggle_images"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_videos else '✅ Allow'} Videos",
+                        callback_data="media_toggle_videos"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_voice else '✅ Allow'} Voice",
+                        callback_data="media_toggle_voice"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_audio else '✅ Allow'} Audio",
+                        callback_data="media_toggle_audio"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_documents else '✅ Allow'} Documents",
+                        callback_data="media_toggle_documents"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_stickers else '✅ Allow'} Stickers",
+                        callback_data="media_toggle_stickers"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_video_notes else '✅ Allow'} Video Notes",
+                        callback_data="media_toggle_video_notes"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_locations else '✅ Allow'} Locations",
+                        callback_data="media_toggle_locations"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton("🔒 Enable Text-Only Mode", callback_data="media_text_only_on")
+                ],
+            ])
+        
+        keyboard.append([
+            InlineKeyboardButton("✅ Done", callback_data="media_done")
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            settings_msg,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        
+        return MEDIA_SETTINGS
+        
+    except Exception as e:
+        logger.error("mediasettings_command_error", user_id=user_id, error=str(e))
+        await update.message.reply_text(
+            "❌ Failed to load media settings. Please try again."
+        )
+        return ConversationHandler.END
+
+
+async def media_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle media settings button callbacks."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
+    callback_data = query.data
+    
+    if not media_manager:
+        await query.edit_message_text("❌ Media settings are not available.")
+        return ConversationHandler.END
+    
+    try:
+        if callback_data == "media_done":
+            await query.edit_message_text(
+                "✅ **Media settings saved!**\n\n"
+                "Your privacy preferences have been updated.",
+                parse_mode="Markdown",
+            )
+            return ConversationHandler.END
+        
+        # Get current preferences
+        preferences = await media_manager.get_preferences(user_id)
+        
+        # Handle text-only mode toggles
+        if callback_data == "media_text_only_on":
+            preferences.text_only = True
+            await media_manager.set_preferences(user_id, preferences)
+            success_msg = "🔒 Text-only mode enabled! You'll only receive text messages."
+        
+        elif callback_data == "media_text_only_off":
+            preferences.text_only = False
+            await media_manager.set_preferences(user_id, preferences)
+            success_msg = "🔓 Text-only mode disabled! You can now configure individual media types."
+        
+        # Handle individual media type toggles
+        elif callback_data.startswith("media_toggle_"):
+            media_type = callback_data.replace("media_toggle_", "")
+            
+            media_map = {
+                "images": "allow_images",
+                "videos": "allow_videos",
+                "voice": "allow_voice",
+                "audio": "allow_audio",
+                "documents": "allow_documents",
+                "stickers": "allow_stickers",
+                "video_notes": "allow_video_notes",
+                "locations": "allow_locations",
+            }
+            
+            if media_type in media_map:
+                pref_key = media_map[media_type]
+                current_value = getattr(preferences, pref_key)
+                new_value = not current_value
+                
+                setattr(preferences, pref_key, new_value)
+                await media_manager.set_preferences(user_id, preferences)
+                
+                action = "blocked" if not new_value else "allowed"
+                success_msg = f"✅ {media_type.replace('_', ' ').title()} {action}!"
+            else:
+                success_msg = "❌ Invalid option."
+        
+        else:
+            success_msg = "❌ Unknown action."
+        
+        # Refresh the settings display
+        preferences = await media_manager.get_preferences(user_id)
+        
+        settings_msg = "🎛️ **Media Privacy Settings**\n\n"
+        settings_msg += "Control what types of media you want to receive:\n\n"
+        
+        if preferences.text_only:
+            settings_msg += "🔒 **Text-Only Mode: ENABLED**\n"
+            settings_msg += "You only receive text messages.\n"
+        else:
+            settings_msg += "📷 Images: " + ("✅ Allowed" if preferences.allow_images else "❌ Blocked") + "\n"
+            settings_msg += "🎥 Videos: " + ("✅ Allowed" if preferences.allow_videos else "❌ Blocked") + "\n"
+            settings_msg += "🎤 Voice Notes: " + ("✅ Allowed" if preferences.allow_voice else "❌ Blocked") + "\n"
+            settings_msg += "🎵 Audio: " + ("✅ Allowed" if preferences.allow_audio else "❌ Blocked") + "\n"
+            settings_msg += "📎 Documents: " + ("✅ Allowed" if preferences.allow_documents else "❌ Blocked") + "\n"
+            settings_msg += "😀 Stickers: " + ("✅ Allowed" if preferences.allow_stickers else "❌ Blocked") + "\n"
+            settings_msg += "📹 Video Notes: " + ("✅ Allowed" if preferences.allow_video_notes else "❌ Blocked") + "\n"
+            settings_msg += "📍 Locations: " + ("✅ Allowed" if preferences.allow_locations else "❌ Blocked") + "\n"
+        
+        settings_msg += f"\n{success_msg}\n"
+        settings_msg += "\n💡 Tap a button to toggle a setting:"
+        
+        # Rebuild keyboard
+        keyboard = []
+        
+        if preferences.text_only:
+            keyboard.append([
+                InlineKeyboardButton("🔓 Disable Text-Only Mode", callback_data="media_text_only_off")
+            ])
+        else:
+            keyboard.extend([
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_images else '✅ Allow'} Images",
+                        callback_data="media_toggle_images"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_videos else '✅ Allow'} Videos",
+                        callback_data="media_toggle_videos"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_voice else '✅ Allow'} Voice",
+                        callback_data="media_toggle_voice"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_audio else '✅ Allow'} Audio",
+                        callback_data="media_toggle_audio"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_documents else '✅ Allow'} Documents",
+                        callback_data="media_toggle_documents"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_stickers else '✅ Allow'} Stickers",
+                        callback_data="media_toggle_stickers"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_video_notes else '✅ Allow'} Video Notes",
+                        callback_data="media_toggle_video_notes"
+                    ),
+                    InlineKeyboardButton(
+                        f"{'❌ Block' if preferences.allow_locations else '✅ Allow'} Locations",
+                        callback_data="media_toggle_locations"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton("🔒 Enable Text-Only Mode", callback_data="media_text_only_on")
+                ],
+            ])
+        
+        keyboard.append([
+            InlineKeyboardButton("✅ Done", callback_data="media_done")
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            settings_msg,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        
+        return MEDIA_SETTINGS
+        
+    except Exception as e:
+        logger.error("media_callback_error", user_id=user_id, error=str(e))
+        await query.edit_message_text(
+            "❌ An error occurred. Please try again."
+        )
+        return ConversationHandler.END
+
 

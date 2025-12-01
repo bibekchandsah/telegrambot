@@ -2,9 +2,8 @@
     - Gender (Male / Female / Any)
     - Country Filter (Any / India / Nepal / Bangladesh / etc)
 
-2. Smart Queue System
+2. Smart Queue System (optional)
     - Estimated waiting time ("Searching… ⏳ Approx. 10 seconds")
-    - Priority queue for active users
     - Match probability indicator
     - Auto timeout + requeue
 
@@ -33,7 +32,7 @@
         - Improve matching
         - Auto-limit toxic users
 
-7. User Profile (inside bot only, anonymous)
+7. User Profile (inside bot only, anonymous) (implemented)
 - No real identity revealed.
 Profile contains:
     - Nickname (not Telegram name)
@@ -41,11 +40,10 @@ Profile contains:
     - Country
     - Online status
     - Rating ⭐
-
 ✔ User can toggle:
     - Anonymous Mode ON/OFF
 
-8. Message Features
+8. Message Features (implemented)
  - ✔ Typing Indicator
     - Show “partner is typing…” using simulation.
 
@@ -60,7 +58,7 @@ Profile contains:
     - “Where are you from?”
     - “Tell me something interesting”
 
-9. Auto-Match Mode
+9. Auto-Match Mode (optional)
     - Once a chat ends → auto-queue for next partner.
 
 10. Anti-Bot System

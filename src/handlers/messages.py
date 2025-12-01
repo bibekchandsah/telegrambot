@@ -6,19 +6,21 @@ from telegram.error import TelegramError, Forbidden, BadRequest
 from telegram.constants import ChatAction
 from src.services.matching import MatchingEngine
 from src.services.activity import ActivityManager
+from src.services.media_preferences import MediaPreferenceManager
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Route messages between chat partners with typing indicators."""
+    """Route messages between chat partners with typing indicators and media filtering."""
     if not update.message:
         return
     
     sender_id = update.effective_user.id
     matching: MatchingEngine = context.bot_data["matching"]
     activity_manager: ActivityManager = context.bot_data.get("activity_manager")
+    media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
     
     try:
         # Mark sender as typing (for the partner to see)
@@ -34,6 +36,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Use /chat to find a partner!"
             )
             return
+        
+        # Determine message type
+        media_type = None
+        if update.message.photo:
+            media_type = "photo"
+        elif update.message.video:
+            media_type = "video"
+        elif update.message.voice:
+            media_type = "voice"
+        elif update.message.audio:
+            media_type = "audio"
+        elif update.message.document:
+            media_type = "document"
+        elif update.message.sticker:
+            media_type = "sticker"
+        elif update.message.video_note:
+            media_type = "video_note"
+        elif update.message.location:
+            media_type = "location"
+        
+        # Check if partner allows this media type
+        if media_type and media_manager:
+            is_allowed, reason = await media_manager.is_media_allowed(partner_id, media_type)
+            
+            if not is_allowed:
+                await update.message.reply_text(
+                    f"❌ **Message not sent**\n\n"
+                    f"{reason}\n\n"
+                    "💡 Try sending a text message instead!",
+                    parse_mode="Markdown",
+                )
+                return
         
         # Show typing indicator to partner
         try:
