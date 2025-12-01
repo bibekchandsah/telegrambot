@@ -1,0 +1,10 @@
+/chat
+/stop
+/next
+/help
+/report
+/profile
+/editprofile
+/preferences
+/cancel
+/status

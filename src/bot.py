@@ -15,6 +15,7 @@ from src.services.matching import MatchingEngine
 from src.services.profile import ProfileManager
 from src.services.preferences import PreferenceManager
 from src.services.feedback import FeedbackManager
+from src.services.activity import ActivityManager
 from src.handlers.commands import (
     start_command,
     help_command,
@@ -62,6 +63,7 @@ async def post_init(application: Application):
         profile_manager = ProfileManager(redis_client)
         preference_manager = PreferenceManager(redis_client)
         feedback_manager = FeedbackManager(redis_client)
+        activity_manager = ActivityManager(redis_client)
         matching_engine = MatchingEngine(
             redis_client,
             profile_manager=profile_manager,
@@ -75,6 +77,7 @@ async def post_init(application: Application):
         application.bot_data["profile_manager"] = profile_manager
         application.bot_data["preference_manager"] = preference_manager
         application.bot_data["feedback_manager"] = feedback_manager
+        application.bot_data["activity_manager"] = activity_manager
         
         logger.info("bot_initialized", bot_username=application.bot.username)
         

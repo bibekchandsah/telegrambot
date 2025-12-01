@@ -1,22 +1,30 @@
 """Message routing handlers."""
+import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError, Forbidden, BadRequest
+from telegram.constants import ChatAction
 from src.services.matching import MatchingEngine
+from src.services.activity import ActivityManager
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Route messages between chat partners."""
+    """Route messages between chat partners with typing indicators."""
     if not update.message:
         return
     
     sender_id = update.effective_user.id
     matching: MatchingEngine = context.bot_data["matching"]
+    activity_manager: ActivityManager = context.bot_data.get("activity_manager")
     
     try:
+        # Mark sender as typing (for the partner to see)
+        if activity_manager:
+            await activity_manager.set_typing(sender_id)
+        
         # Get partner
         partner_id = await matching.get_partner(sender_id)
         
@@ -27,6 +35,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
+        # Show typing indicator to partner
+        try:
+            await context.bot.send_chat_action(
+                chat_id=partner_id,
+                action=ChatAction.TYPING,
+            )
+            # Small delay to make typing indicator visible
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            logger.debug("typing_indicator_failed", partner_id=partner_id, error=str(e))
+        
         # Route message based on type
         try:
             if update.message.text:
@@ -36,6 +55,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     entities=update.message.entities,
                 )
             elif update.message.photo:
+                # Show upload photo action
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=partner_id,
+                        action=ChatAction.UPLOAD_PHOTO,
+                    )
+                    await asyncio.sleep(0.3)
+                except Exception:
+                    pass
+                
                 # Send the highest resolution photo
                 photo = update.message.photo[-1]
                 await context.bot.send_photo(
@@ -45,6 +74,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption_entities=update.message.caption_entities,
                 )
             elif update.message.video:
+                # Show upload video action
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=partner_id,
+                        action=ChatAction.UPLOAD_VIDEO,
+                    )
+                    await asyncio.sleep(0.3)
+                except Exception:
+                    pass
+                
                 await context.bot.send_video(
                     partner_id,
                     update.message.video.file_id,
@@ -52,12 +91,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption_entities=update.message.caption_entities,
                 )
             elif update.message.voice:
+                # Show upload voice action
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=partner_id,
+                        action=ChatAction.UPLOAD_VOICE,
+                    )
+                    await asyncio.sleep(0.3)
+                except Exception:
+                    pass
+                
                 await context.bot.send_voice(
                     partner_id,
                     update.message.voice.file_id,
                     caption=update.message.caption,
                 )
             elif update.message.audio:
+                # Show upload audio action
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=partner_id,
+                        action=ChatAction.UPLOAD_AUDIO,
+                    )
+                    await asyncio.sleep(0.3)
+                except Exception:
+                    pass
+                
                 await context.bot.send_audio(
                     partner_id,
                     update.message.audio.file_id,
@@ -65,6 +124,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption_entities=update.message.caption_entities,
                 )
             elif update.message.document:
+                # Show upload document action
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=partner_id,
+                        action=ChatAction.UPLOAD_DOCUMENT,
+                    )
+                    await asyncio.sleep(0.3)
+                except Exception:
+                    pass
+                
                 await context.bot.send_document(
                     partner_id,
                     update.message.document.file_id,
@@ -77,6 +146,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     update.message.sticker.file_id,
                 )
             elif update.message.video_note:
+                # Show upload video note action
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=partner_id,
+                        action=ChatAction.UPLOAD_VIDEO_NOTE,
+                    )
+                    await asyncio.sleep(0.3)
+                except Exception:
+                    pass
+                
                 await context.bot.send_video_note(
                     partner_id,
                     update.message.video_note.file_id,
@@ -89,6 +168,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption_entities=update.message.caption_entities,
                 )
             elif update.message.location:
+                # Show find location action
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=partner_id,
+                        action=ChatAction.FIND_LOCATION,
+                    )
+                    await asyncio.sleep(0.3)
+                except Exception:
+                    pass
+                
                 await context.bot.send_location(
                     partner_id,
                     latitude=update.message.location.latitude,

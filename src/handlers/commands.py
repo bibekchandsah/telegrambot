@@ -169,8 +169,8 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 match_msg += f"👤 **Partner's Profile:**\n"
                 match_msg += f"📝 {partner_profile.nickname}\n"
                 match_msg += f"{'👨' if partner_profile.gender == 'Male' else '👩' if partner_profile.gender == 'Female' else '🧑'} {partner_profile.gender}\n"
-                match_msg += f"🌍 {partner_profile.country}\n\n"
-            match_msg += "👋 Say hi and start chatting!\n"
+                match_msg += f"🌍 {partner_profile.country}\n"
+            match_msg += "\n👋 Say hi and start chatting!\n"
             match_msg += "Use /next to skip or /stop to end."
             
             await update.message.reply_text(
@@ -184,8 +184,8 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 partner_match_msg += f"👤 **Partner's Profile:**\n"
                 partner_match_msg += f"📝 {user_profile.nickname}\n"
                 partner_match_msg += f"{'👨' if user_profile.gender == 'Male' else '👩' if user_profile.gender == 'Female' else '🧑'} {user_profile.gender}\n"
-                partner_match_msg += f"🌍 {user_profile.country}\n\n"
-            partner_match_msg += "👋 Say hi and start chatting!\n"
+                partner_match_msg += f"🌍 {user_profile.country}\n"
+            partner_match_msg += "\n👋 Say hi and start chatting!\n"
             partner_match_msg += "Use /next to skip or /stop to end."
             
             await context.bot.send_message(
@@ -356,6 +356,7 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if new_partner_id:
             profile_manager: ProfileManager = context.bot_data.get("profile_manager")
+            activity_manager = context.bot_data.get("activity_manager")
             
             # Get partner's profile
             partner_profile = None
@@ -364,19 +365,31 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 partner_profile = await profile_manager.get_profile(new_partner_id)
                 user_profile = await profile_manager.get_profile(user_id)
             
+            # Get partner's online status
+            partner_status = ""
+            if activity_manager:
+                partner_status = await activity_manager.get_status_text(new_partner_id)
+            
             # Send match notification to user with partner's profile
             match_msg = "✅ **New partner found!**\n\n"
             if partner_profile:
                 match_msg += f"👤 **Partner's Profile:**\n"
                 match_msg += f"📝 {partner_profile.nickname}\n"
                 match_msg += f"{'👨' if partner_profile.gender == 'Male' else '👩' if partner_profile.gender == 'Female' else '🧑'} {partner_profile.gender}\n"
-                match_msg += f"🌍 {partner_profile.country}\n\n"
-            match_msg += "👋 Say hi and start chatting!"
+                match_msg += f"🌍 {partner_profile.country}\n"
+            if partner_status:
+                match_msg += f"📶 {partner_status}\n"
+            match_msg += "\n👋 Say hi and start chatting!"
             
             await update.message.reply_text(
                 match_msg,
                 parse_mode="Markdown",
             )
+            
+            # Get user's online status
+            user_status = ""
+            if activity_manager:
+                user_status = await activity_manager.get_status_text(user_id)
             
             # Send match notification to partner with user's profile
             partner_match_msg = "✅ **Partner found!**\n\n"
@@ -384,8 +397,10 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 partner_match_msg += f"👤 **Partner's Profile:**\n"
                 partner_match_msg += f"📝 {user_profile.nickname}\n"
                 partner_match_msg += f"{'👨' if user_profile.gender == 'Male' else '👩' if user_profile.gender == 'Female' else '🧑'} {user_profile.gender}\n"
-                partner_match_msg += f"🌍 {user_profile.country}\n\n"
-            partner_match_msg += "👋 Say hi and start chatting!"
+                partner_match_msg += f"🌍 {user_profile.country}\n"
+            if user_status:
+                partner_match_msg += f"📶 {user_status}\n"
+            partner_match_msg += "\n👋 Say hi and start chatting!"
             
             await context.bot.send_message(
                 new_partner_id,

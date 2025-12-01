@@ -25,7 +25,7 @@
     - Disable forwarding of messages
     - Disable saving photos (Telegram API allows restricted permissions)
 
-6. Anonymous Feedback System
+6. Anonymous Feedback System (implemented)
     Users can rate their partner:
         - 👍 Good
         - 👎 Bad
