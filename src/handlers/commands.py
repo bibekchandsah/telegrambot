@@ -51,7 +51,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Register user for broadcast
     admin_manager: AdminManager = context.bot_data.get("admin_manager")
     if admin_manager:
-        await admin_manager.register_user(user.id)
+        await admin_manager.register_user(
+            user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            language_code=user.language_code,
+            is_bot=user.is_bot,
+            is_premium=user.is_premium
+        )
     
     welcome_message = (
         f"👋 Welcome to Anonymous Random Chat, {user.first_name}!\n\n"

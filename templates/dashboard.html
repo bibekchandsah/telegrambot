@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Telegram Bot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🤖 Telegram Bot - Admin Dashboard</h1>
+            <div class="header-info">
+                <span id="current-time"></span>
+            </div>
+        </header>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="total-users">-</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="users-with-profiles">-</div>
+                    <div class="stat-label">With Profiles</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="active-users">-</div>
+                    <div class="stat-label">Active Users</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="users-in-queue">-</div>
+                    <div class="stat-label">In Queue</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💬</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="users-in-chat">-</div>
+                    <div class="stat-label">In Chat</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-button active" data-tab="all-users">All Users</button>
+            <button class="tab-button" data-tab="online-users">Online Users</button>
+            <button class="tab-button" data-tab="in-chat">In Chat</button>
+            <button class="tab-button" data-tab="in-queue">In Queue</button>
+            <button class="tab-button" data-tab="search">Search Users</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- All Users Tab -->
+            <div id="all-users" class="tab-pane active">
+                <div class="section-header">
+                    <h2>All Users</h2>
+                    <button class="btn btn-primary" onclick="loadAllUsers()">🔄 Refresh</button>
+                </div>
+                <div class="pagination-info" id="pagination-info"></div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Username</th>
+                                <th>Gender</th>
+                                <th>Country</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="all-users-table">
+                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
+
+            <!-- Online Users Tab -->
+            <div id="online-users" class="tab-pane">
+                <div class="section-header">
+                    <h2>Online Users</h2>
+                    <button class="btn btn-primary" onclick="loadOnlineUsers()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Username</th>
+                                <th>Gender</th>
+                                <th>Country</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="online-users-table">
+                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- In Chat Tab -->
+            <div id="in-chat" class="tab-pane">
+                <div class="section-header">
+                    <h2>Users Currently in Chat</h2>
+                    <button class="btn btn-primary" onclick="loadUsersInChat()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Username</th>
+                                <th>Gender</th>
+                                <th>Country</th>
+                                <th>Partner ID</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="in-chat-table">
+                            <tr><td colspan="6" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- In Queue Tab -->
+            <div id="in-queue" class="tab-pane">
+                <div class="section-header">
+                    <h2>Users in Queue</h2>
+                    <button class="btn btn-primary" onclick="loadUsersInQueue()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Username</th>
+                                <th>Gender</th>
+                                <th>Country</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="in-queue-table">
+                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Search Tab -->
+            <div id="search" class="tab-pane">
+                <div class="section-header">
+                    <h2>Search Users</h2>
+                </div>
+                <div class="search-form">
+                    <div class="form-group">
+                        <label>User ID:</label>
+                        <input type="text" id="search-user-id" placeholder="Enter user ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Username:</label>
+                        <input type="text" id="search-username" placeholder="Enter username">
+                    </div>
+                    <div class="form-group">
+                        <label>Gender:</label>
+                        <select id="search-gender">
+                            <option value="">All</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Country:</label>
+                        <input type="text" id="search-country" placeholder="Enter country">
+                    </div>
+                    <button class="btn btn-primary" onclick="searchUsers()">🔍 Search</button>
+                    <button class="btn btn-secondary" onclick="clearSearch()">Clear</button>
+                </div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Username</th>
+                                <th>Gender</th>
+                                <th>Country</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="search-results-table">
+                            <tr><td colspan="5" class="no-data">Enter search criteria above</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Detail Modal -->
+        <div id="user-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeUserModal()">&times;</span>
+                <h2>User Details</h2>
+                <div id="user-details">
+                    <p class="loading">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

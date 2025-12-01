@@ -32,17 +32,43 @@ class AdminManager:
         """
         return user_id in self.admin_ids
     
-    async def register_user(self, user_id: int) -> None:
+    async def register_user(self, user_id: int, username: str = None, first_name: str = None, 
+                           last_name: str = None, language_code: str = None, 
+                           is_bot: bool = False, is_premium: bool = False) -> None:
         """
         Register a user in the bot (called when they use /start).
         
         Args:
             user_id: Telegram user ID
+            username: Telegram username (optional)
+            first_name: Telegram first name (optional)
+            last_name: Telegram last name (optional)
+            language_code: User's language code (optional)
+            is_bot: Whether user is a bot (optional)
+            is_premium: Whether user has Telegram Premium (optional)
         """
         try:
             # Add user to a set of all users
             await self.redis.sadd("bot:all_users", str(user_id))
-            logger.debug("user_registered", user_id=user_id)
+            
+            # Store user info (username and name)
+            if username or first_name:
+                import json
+                user_info = {
+                    'username': username,
+                    'first_name': first_name,
+                    'last_name': last_name,
+                    'language_code': language_code,
+                    'is_bot': is_bot,
+                    'is_premium': is_premium
+                }
+                await self.redis.set(
+                    f"user_info:{user_id}",
+                    json.dumps(user_info),
+                    ex=None  # No expiry
+                )
+            
+            logger.debug("user_registered", user_id=user_id, username=username)
         except Exception as e:
             logger.error("register_user_error", user_id=user_id, error=str(e))
     

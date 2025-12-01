@@ -1,5 +1,6 @@
 """Message routing handlers."""
 import asyncio
+import json
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError, Forbidden, BadRequest
@@ -7,6 +8,7 @@ from telegram.constants import ChatAction
 from src.services.matching import MatchingEngine
 from src.services.activity import ActivityManager
 from src.services.media_preferences import MediaPreferenceManager
+from src.services.admin import AdminManager
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -21,6 +23,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     matching: MatchingEngine = context.bot_data["matching"]
     activity_manager: ActivityManager = context.bot_data.get("activity_manager")
     media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    # Store user info for dashboard
+    if admin_manager:
+        try:
+            user = update.effective_user
+            await admin_manager.register_user(
+                user.id,
+                username=user.username,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                language_code=user.language_code,
+                is_bot=user.is_bot,
+                is_premium=user.is_premium
+            )
+        except Exception as e:
+            logger.debug("user_info_storage_failed", user_id=sender_id, error=str(e))
     
     try:
         # Mark sender as typing (for the partner to see)

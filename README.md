@@ -12,6 +12,7 @@ A production-ready, fully anonymous Telegram bot that randomly connects users fo
 - 🔒 **Production Ready** - Comprehensive error handling and logging
 - 📊 **Scalable** - Handles 1000+ concurrent users
 - 🐳 **Docker Support** - Easy deployment with Docker Compose
+- 📱 **Admin Dashboard** - Web-based monitoring and user management
 
 ## 🚀 Quick Start
 
@@ -68,6 +69,48 @@ python -m src.bot
 
 The bot is now running! 🎉
 
+## 📊 Admin Dashboard
+
+The bot includes a powerful web-based admin dashboard for monitoring and managing users.
+
+### Quick Start Dashboard
+
+```bash
+# Install dashboard dependencies (if not already installed)
+pip install flask flask-cors
+
+# Start the dashboard
+python admin_dashboard.py
+
+# Or use the startup script (Windows)
+start_dashboard.bat
+```
+
+Access at: **http://localhost:5000**
+
+### Dashboard Features
+
+- 📈 **Real-time Statistics** - Total users, active users, queue status
+- 👥 **User Management** - View all users with pagination
+- 🟢 **Online Monitoring** - See currently active users
+- 💬 **Chat Monitoring** - View active chat sessions and pairs
+- ⏳ **Queue Status** - Monitor users waiting for matches
+- 🔍 **Search Users** - Find users by ID, username, gender, country
+- 📋 **User Details** - Complete profile and preference information
+
+### Documentation
+
+- **Quick Start:** See `DASHBOARD_QUICKSTART.md` for 5-minute setup
+- **Full Guide:** See `ADMIN_DASHBOARD.md` for complete documentation
+
+### Configuration
+
+Add to your `.env` file:
+```env
+DASHBOARD_PORT=5000        # Dashboard port (default: 5000)
+DASHBOARD_HOST=0.0.0.0     # Host address
+```
+
 ## 🐳 Docker Deployment
 
 ### Using Docker Compose (Recommended)
@@ -123,15 +166,28 @@ telegram-random-chat-bot/
 │   │   └── messages.py        # Message routing logic
 │   ├── services/
 │   │   ├── queue.py           # Queue management with Lua scripts
-│   │   └── matching.py        # Pairing and state management
+│   │   ├── matching.py        # Pairing and state management
+│   │   └── dashboard.py       # Dashboard service layer
 │   ├── db/
 │   │   └── redis_client.py    # Redis connection pool
 │   └── utils/
 │       ├── logger.py          # Structured logging
 │       └── decorators.py      # Rate limiting, etc.
+├── templates/
+│   └── dashboard.html         # Admin dashboard UI
+├── static/
+│   ├── css/
+│   │   └── dashboard.css      # Dashboard styling
+│   └── js/
+│       └── dashboard.js       # Dashboard functionality
+├── admin_dashboard.py         # Dashboard Flask application
+├── start_dashboard.bat        # Dashboard startup script (Windows)
+├── start_dashboard.ps1        # Dashboard startup script (PowerShell)
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
+├── ADMIN_DASHBOARD.md         # Dashboard documentation
+├── DASHBOARD_QUICKSTART.md    # Dashboard quick start guide
 └── README.md
 ```
 
@@ -354,8 +410,8 @@ Structured JSON logs in production mode:
 ### Phase 2: Enhancement
 - [ ] Gender/age filters
 - [ ] Language preferences
-- [ ] User statistics dashboard
-- [ ] Admin panel
+- [x] User statistics dashboard
+- [x] Admin panel
 
 ### Phase 3: Advanced
 - [ ] AI content moderation

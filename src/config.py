@@ -28,6 +28,10 @@ class Config:
         if admin_id.strip()
     ]
     
+    # Dashboard settings
+    DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "5000"))
+    DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "0.0.0.0")
+    
     # Environment
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     
