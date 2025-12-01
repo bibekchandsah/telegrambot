@@ -19,7 +19,7 @@
         - 3 reports → temporary ban
         - 5 reports → permanent ban
 
-5. Privacy & Anti-Stalker Features
+5. Privacy & Anti-Stalker Features (implemented)
     - Unique session ID on every match
     - Disable forwarding of messages
     - Disable saving photos (Telegram API allows restricted permissions)

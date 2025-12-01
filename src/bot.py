@@ -17,6 +17,7 @@ from src.services.preferences import PreferenceManager
 from src.services.feedback import FeedbackManager
 from src.services.activity import ActivityManager
 from src.services.media_preferences import MediaPreferenceManager
+from src.services.admin import AdminManager
 from src.handlers.commands import (
     start_command,
     help_command,
@@ -39,12 +40,20 @@ from src.handlers.commands import (
     rating_command,
     mediasettings_command,
     media_callback,
+    admin_command,
+    broadcast_command,
+    broadcastactive_command,
+    broadcast_message_step,
+    broadcast_callback,
+    stats_command,
+    cancel_broadcast,
     NICKNAME,
     GENDER,
     COUNTRY,
     PREF_GENDER,
     PREF_COUNTRY,
     MEDIA_SETTINGS,
+    BROADCAST_MESSAGE,
 )
 from src.handlers.messages import (
     handle_message,
@@ -69,6 +78,7 @@ async def post_init(application: Application):
         feedback_manager = FeedbackManager(redis_client)
         activity_manager = ActivityManager(redis_client)
         media_manager = MediaPreferenceManager(redis_client)
+        admin_manager = AdminManager(redis_client, Config.ADMIN_IDS)
         matching_engine = MatchingEngine(
             redis_client,
             profile_manager=profile_manager,
@@ -84,6 +94,7 @@ async def post_init(application: Application):
         application.bot_data["feedback_manager"] = feedback_manager
         application.bot_data["activity_manager"] = activity_manager
         application.bot_data["media_manager"] = media_manager
+        application.bot_data["admin_manager"] = admin_manager
         
         logger.info("bot_initialized", bot_username=application.bot.username)
         
@@ -170,6 +181,10 @@ def main():
         application.add_handler(CommandHandler("profile", profile_command))
         application.add_handler(CommandHandler("rating", rating_command))
         
+        # Register admin commands
+        application.add_handler(CommandHandler("admin", admin_command))
+        application.add_handler(CommandHandler("stats", stats_command))
+        
         # Register feedback callback handler
         application.add_handler(
             CallbackQueryHandler(
@@ -192,6 +207,25 @@ def main():
             fallbacks=[],
         )
         application.add_handler(media_conv_handler)
+        
+        # Register admin broadcast conversation handler
+        broadcast_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler("broadcast", broadcast_command),
+                CommandHandler("broadcastactive", broadcastactive_command),
+            ],
+            states={
+                BROADCAST_MESSAGE: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_message_step),
+                    CallbackQueryHandler(
+                        broadcast_callback,
+                        pattern="^broadcast_(confirm|cancel)$",
+                    ),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_broadcast)],
+        )
+        application.add_handler(broadcast_conv_handler)
         
         # Register profile editing conversation handler
         profile_conv_handler = ConversationHandler(

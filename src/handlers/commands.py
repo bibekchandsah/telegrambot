@@ -25,6 +25,7 @@ from src.services.media_preferences import (
     MediaPreferenceManager,
     MediaPreferences,
 )
+from src.services.admin import AdminManager
 from src.utils.decorators import rate_limit
 from src.utils.logger import get_logger
 
@@ -39,10 +40,18 @@ PREF_GENDER, PREF_COUNTRY = range(3, 5)
 # Conversation states for media settings
 MEDIA_SETTINGS = 5
 
+# Conversation states for admin broadcast
+BROADCAST_MESSAGE = 6
+
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
     user = update.effective_user
+    
+    # Register user for broadcast
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    if admin_manager:
+        await admin_manager.register_user(user.id)
     
     welcome_message = (
         f"👋 Welcome to Anonymous Random Chat, {user.first_name}!\n\n"
@@ -1459,5 +1468,257 @@ async def media_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❌ An error occurred. Please try again."
         )
         return ConversationHandler.END
+
+
+# ============================================
+# ADMIN COMMANDS
+# ============================================
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /admin command - show admin panel."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    admin_msg = (
+        "🔐 **Admin Panel**\n\n"
+        "Available commands:\n\n"
+        "/broadcast - Send message to all users\n"
+        "/broadcastactive - Send to active users only\n"
+        "/stats - View bot statistics\n\n"
+        "Use these commands responsibly."
+    )
+    
+    await update.message.reply_text(admin_msg, parse_mode="Markdown")
+
+
+async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /broadcast command - broadcast to all users."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    # Store broadcast type in context
+    context.user_data["broadcast_type"] = "all"
+    
+    await update.message.reply_text(
+        "📢 **Broadcast to All Users**\n\n"
+        "Send the message you want to broadcast.\n"
+        "It will be sent to ALL users who have used the bot.\n\n"
+        "Use /cancel to abort.",
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_MESSAGE
+
+
+async def broadcastactive_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /broadcastactive command - broadcast to active users only."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    # Store broadcast type in context
+    context.user_data["broadcast_type"] = "active"
+    
+    await update.message.reply_text(
+        "📢 **Broadcast to Active Users**\n\n"
+        "Send the message you want to broadcast.\n"
+        "It will be sent to users currently in chat or queue.\n\n"
+        "Use /cancel to abort.",
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_MESSAGE
+
+
+async def broadcast_message_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle broadcast message input."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    broadcast_type = context.user_data.get("broadcast_type", "all")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    message_text = update.message.text
+    
+    # Show confirmation
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Confirm Send", callback_data="broadcast_confirm"),
+            InlineKeyboardButton("❌ Cancel", callback_data="broadcast_cancel"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Store message in context
+    context.user_data["broadcast_message"] = message_text
+    
+    target = "ALL users" if broadcast_type == "all" else "ACTIVE users (in chat/queue)"
+    
+    await update.message.reply_text(
+        f"📢 **Broadcast Preview**\n\n"
+        f"Target: {target}\n\n"
+        f"Message:\n{message_text}\n\n"
+        f"Ready to send?",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_MESSAGE
+
+
+async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle broadcast confirmation callback."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    callback_data = query.data
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await query.edit_message_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    if callback_data == "broadcast_cancel":
+        await query.edit_message_text(
+            "❌ Broadcast cancelled."
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    elif callback_data == "broadcast_confirm":
+        broadcast_type = context.user_data.get("broadcast_type", "all")
+        message_text = context.user_data.get("broadcast_message", "")
+        
+        if not message_text:
+            await query.edit_message_text(
+                "❌ No message to broadcast."
+            )
+            return ConversationHandler.END
+        
+        await query.edit_message_text(
+            "📤 Sending broadcast...\n"
+            "This may take a few moments."
+        )
+        
+        # Get target users
+        if broadcast_type == "active":
+            target_users = await admin_manager.get_active_users()
+        else:
+            target_users = await admin_manager.get_all_users()
+        
+        # Send broadcast
+        success_count = 0
+        failed_count = 0
+        
+        import asyncio
+        
+        for target_user_id in target_users:
+            try:
+                await context.bot.send_message(
+                    target_user_id,
+                    f"📢 **Admin Announcement**\n\n{message_text}",
+                    parse_mode="Markdown",
+                )
+                success_count += 1
+                
+                # Small delay to avoid rate limits (30 messages per second limit)
+                if success_count % 25 == 0:
+                    await asyncio.sleep(1)
+                    
+            except Exception as e:
+                failed_count += 1
+                logger.debug(
+                    "broadcast_failed",
+                    target_user_id=target_user_id,
+                    error=str(e),
+                )
+        
+        # Record broadcast
+        await admin_manager.record_broadcast(
+            admin_id=user_id,
+            message=message_text,
+            target_type=broadcast_type,
+            success_count=success_count,
+            failed_count=failed_count,
+        )
+        
+        # Send summary
+        await context.bot.send_message(
+            user_id,
+            f"✅ **Broadcast Complete**\n\n"
+            f"Target: {broadcast_type.upper()}\n"
+            f"✅ Sent: {success_count}\n"
+            f"❌ Failed: {failed_count}\n"
+            f"📊 Total: {len(target_users)}",
+            parse_mode="Markdown",
+        )
+        
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    return BROADCAST_MESSAGE
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /stats command - show bot statistics."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    try:
+        # Get statistics
+        all_users = await admin_manager.get_all_users()
+        active_users = await admin_manager.get_active_users()
+        
+        stats_msg = (
+            "📊 **Bot Statistics**\n\n"
+            f"👥 Total Users: {len(all_users)}\n"
+            f"🟢 Active Users: {len(active_users)}\n"
+            f"⚪ Idle Users: {len(all_users) - len(active_users)}\n"
+        )
+        
+        await update.message.reply_text(stats_msg, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error("stats_command_error", error=str(e))
+        await update.message.reply_text(
+            "❌ Failed to fetch statistics."
+        )
+
+
+async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel broadcast operation."""
+    context.user_data.clear()
+    await update.message.reply_text("❌ Broadcast cancelled.")
+    return ConversationHandler.END
 
 

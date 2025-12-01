@@ -122,6 +122,24 @@ class RedisClient:
             logger.error("redis_keys_error", pattern=pattern, error=str(e))
             raise
     
+    async def scan(self, cursor: int = 0, match: str = None, count: int = 100):
+        """
+        Scan keys using cursor-based iteration.
+        
+        Args:
+            cursor: Cursor position (0 to start)
+            match: Pattern to match keys
+            count: Number of keys to return per iteration
+            
+        Returns:
+            Tuple of (next_cursor, list_of_keys)
+        """
+        try:
+            return await self.client.scan(cursor=cursor, match=match, count=count)
+        except RedisError as e:
+            logger.error("redis_scan_error", error=str(e))
+            raise
+    
     async def eval(self, script: str, numkeys: int, *keys_and_args) -> any:
         """Evaluate Lua script."""
         try:
@@ -148,6 +166,22 @@ class RedisClient:
             return await self.client.expire(key, time)
         except RedisError as e:
             logger.error("redis_expire_error", key=key, error=str(e))
+            raise
+    
+    async def sadd(self, key: str, *members: str) -> int:
+        """Add members to a set."""
+        try:
+            return await self.client.sadd(key, *members)
+        except RedisError as e:
+            logger.error("redis_sadd_error", key=key, error=str(e))
+            raise
+    
+    async def smembers(self, key: str) -> set:
+        """Get all members of a set."""
+        try:
+            return await self.client.smembers(key)
+        except RedisError as e:
+            logger.error("redis_smembers_error", key=key, error=str(e))
             raise
 
 

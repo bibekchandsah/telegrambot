@@ -21,6 +21,13 @@ class Config:
     CHAT_TIMEOUT = int(os.getenv("CHAT_TIMEOUT", "600"))
     NEXT_COMMAND_LIMIT = int(os.getenv("NEXT_COMMAND_LIMIT", "10"))
     
+    # Admin settings
+    ADMIN_IDS = [
+        int(admin_id.strip()) 
+        for admin_id in os.getenv("ADMIN_IDS", "").split(",") 
+        if admin_id.strip()
+    ]
+    
     # Environment
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     
