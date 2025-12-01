@@ -87,6 +87,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     partner_id,
                     update.message.text,
                     entities=update.message.entities,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.photo:
                 # Show upload photo action
@@ -106,6 +107,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     photo.file_id,
                     caption=update.message.caption,
                     caption_entities=update.message.caption_entities,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.video:
                 # Show upload video action
@@ -123,6 +125,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     update.message.video.file_id,
                     caption=update.message.caption,
                     caption_entities=update.message.caption_entities,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.voice:
                 # Show upload voice action
@@ -139,6 +142,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     partner_id,
                     update.message.voice.file_id,
                     caption=update.message.caption,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.audio:
                 # Show upload audio action
@@ -156,6 +160,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     update.message.audio.file_id,
                     caption=update.message.caption,
                     caption_entities=update.message.caption_entities,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.document:
                 # Show upload document action
@@ -173,11 +178,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     update.message.document.file_id,
                     caption=update.message.caption,
                     caption_entities=update.message.caption_entities,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.sticker:
                 await context.bot.send_sticker(
                     partner_id,
                     update.message.sticker.file_id,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.video_note:
                 # Show upload video note action
@@ -193,6 +200,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_video_note(
                     partner_id,
                     update.message.video_note.file_id,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.animation:
                 await context.bot.send_animation(
@@ -200,6 +208,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     update.message.animation.file_id,
                     caption=update.message.caption,
                     caption_entities=update.message.caption_entities,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.location:
                 # Show find location action
@@ -216,6 +225,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     partner_id,
                     latitude=update.message.location.latitude,
                     longitude=update.message.location.longitude,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.contact:
                 await context.bot.send_contact(
@@ -223,6 +233,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     phone_number=update.message.contact.phone_number,
                     first_name=update.message.contact.first_name,
                     last_name=update.message.contact.last_name,
+                    protect_content=True,  # Disable forwarding and saving
                 )
             else:
                 # Fallback: try to copy the message

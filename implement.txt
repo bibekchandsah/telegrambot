@@ -7,7 +7,7 @@
     - Match probability indicator
     - Auto timeout + requeue
 
-3. Multi-Media Controls
+3. Multi-Media Controls (implemented)
 - User can choose privacy levels.
     - Allow/disable images
     - Allow/disable voice notes
