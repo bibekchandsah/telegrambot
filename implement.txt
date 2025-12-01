@@ -1,4 +1,4 @@
-1. Let users choose preferences before matching:
+1. Let users choose preferences before matching: (implemented)
     - Gender (Male / Female / Any)
     - Country Filter (Any / India / Nepal / Bangladesh / etc)
 

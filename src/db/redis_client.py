@@ -50,10 +50,10 @@ class RedisClient:
             logger.error("redis_get_error", key=key, error=str(e))
             raise
     
-    async def set(self, key: str, value: str, ex: Optional[int] = None) -> bool:
-        """Set value in Redis with optional expiry."""
+    async def set(self, key: str, value: str, ex: Optional[int] = None, nx: bool = False) -> bool:
+        """Set value in Redis with optional expiry and nx flag."""
         try:
-            return await self.client.set(key, value, ex=ex)
+            return await self.client.set(key, value, ex=ex, nx=nx)
         except RedisError as e:
             logger.error("redis_set_error", key=key, error=str(e))
             raise
@@ -104,6 +104,14 @@ class RedisClient:
             return await self.client.llen(key)
         except RedisError as e:
             logger.error("redis_llen_error", key=key, error=str(e))
+            raise
+    
+    async def lrange(self, key: str, start: int, end: int) -> list:
+        """Get range of elements from list."""
+        try:
+            return await self.client.lrange(key, start, end)
+        except RedisError as e:
+            logger.error("redis_lrange_error", key=key, error=str(e))
             raise
     
     async def keys(self, pattern: str) -> list:

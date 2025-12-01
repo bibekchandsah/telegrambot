@@ -11,11 +11,12 @@ logger = get_logger(__name__)
 class MatchingEngine:
     """Handles user pairing and chat state management."""
     
-    def __init__(self, redis: RedisClient, profile_manager=None, preference_manager=None):
+    def __init__(self, redis: RedisClient, profile_manager=None, preference_manager=None, feedback_manager=None):
         self.redis = redis
         self.queue = QueueManager(redis)
         self.profile_manager = profile_manager
         self.preference_manager = preference_manager
+        self.feedback_manager = feedback_manager
     
     async def find_partner(self, user_id: int) -> Optional[int]:
         """
@@ -34,6 +35,13 @@ class MatchingEngine:
                     state=state,
                 )
                 return None
+            
+            # Check if user is limited due to toxic behavior
+            if self.feedback_manager:
+                is_limited, limit_reason = await self.feedback_manager.is_user_limited(user_id)
+                if is_limited:
+                    logger.warning("user_limited", user_id=user_id)
+                    raise Exception(limit_reason)
             
             # Set user state to IN_QUEUE
             await self.set_user_state(user_id, "IN_QUEUE")
@@ -56,6 +64,12 @@ class MatchingEngine:
             if partner_id:
                 # Match found, create the pair
                 await self.create_pair(user_id, partner_id)
+                
+                # Increment chat counts for both users
+                if self.feedback_manager:
+                    await self.feedback_manager.increment_chat_count(user_id)
+                    await self.feedback_manager.increment_chat_count(partner_id)
+                
                 return partner_id
             
             # No compatible partner found, add to queue
@@ -80,11 +94,15 @@ class MatchingEngine:
         user_preferences,
     ) -> Optional[int]:
         """
-        Find a compatible partner from the queue based on mutual preferences.
+        Find a compatible partner from the queue based on mutual preferences and ratings.
+        
+        Prioritizes users with good ratings.
         
         Checks:
         1. User's preferences match potential partner's profile
         2. Potential partner's preferences match user's profile
+        3. Filters out toxic users
+        4. Prioritizes partners with good ratings
         
         Returns:
             Partner ID if compatible match found, None otherwise
@@ -96,10 +114,23 @@ class MatchingEngine:
             if not queue_users:
                 return None
             
-            # Try to find a compatible match
+            # Build list of compatible partners with their ratings
+            compatible_partners = []
+            
             for potential_partner_id in queue_users:
                 if potential_partner_id == user_id:
                     continue
+                
+                # Skip toxic users
+                if self.feedback_manager:
+                    partner_rating = await self.feedback_manager.get_rating(potential_partner_id)
+                    if partner_rating.is_toxic:
+                        logger.debug(
+                            "skipping_toxic_user",
+                            user_id=user_id,
+                            partner_id=potential_partner_id,
+                        )
+                        continue
                 
                 # Get potential partner's profile and preferences
                 partner_profile = None
@@ -122,19 +153,36 @@ class MatchingEngine:
                     partner_profile,
                     partner_preferences,
                 ):
-                    # Remove partner from queue
-                    await self.queue.leave_queue(potential_partner_id)
+                    # Get partner's rating score for prioritization
+                    rating_score = 50.0  # Default neutral score
+                    if self.feedback_manager:
+                        partner_rating = await self.feedback_manager.get_rating(
+                            potential_partner_id
+                        )
+                        rating_score = partner_rating.rating_score
                     
-                    logger.info(
-                        "compatible_match_found",
-                        user_id=user_id,
-                        partner_id=potential_partner_id,
-                    )
-                    
-                    return potential_partner_id
+                    compatible_partners.append((potential_partner_id, rating_score))
             
-            # No compatible match found
-            return None
+            if not compatible_partners:
+                return None
+            
+            # Sort by rating score (highest first) for priority matching
+            compatible_partners.sort(key=lambda x: x[1], reverse=True)
+            
+            # Select the best-rated compatible partner
+            best_partner_id, best_score = compatible_partners[0]
+            
+            # Remove partner from queue
+            await self.queue.leave_queue(best_partner_id)
+            
+            logger.info(
+                "compatible_match_found",
+                user_id=user_id,
+                partner_id=best_partner_id,
+                partner_score=best_score,
+            )
+            
+            return best_partner_id
             
         except Exception as e:
             logger.error(

@@ -14,6 +14,7 @@ from src.db.redis_client import redis_client
 from src.services.matching import MatchingEngine
 from src.services.profile import ProfileManager
 from src.services.preferences import PreferenceManager
+from src.services.feedback import FeedbackManager
 from src.handlers.commands import (
     start_command,
     help_command,
@@ -32,6 +33,8 @@ from src.handlers.commands import (
     pref_gender_callback,
     pref_country_text,
     cancel_preferences,
+    feedback_callback,
+    rating_command,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -58,10 +61,12 @@ async def post_init(application: Application):
         # Initialize managers
         profile_manager = ProfileManager(redis_client)
         preference_manager = PreferenceManager(redis_client)
+        feedback_manager = FeedbackManager(redis_client)
         matching_engine = MatchingEngine(
             redis_client,
             profile_manager=profile_manager,
             preference_manager=preference_manager,
+            feedback_manager=feedback_manager,
         )
         
         # Store instances in bot_data for access in handlers
@@ -69,6 +74,7 @@ async def post_init(application: Application):
         application.bot_data["matching"] = matching_engine
         application.bot_data["profile_manager"] = profile_manager
         application.bot_data["preference_manager"] = preference_manager
+        application.bot_data["feedback_manager"] = feedback_manager
         
         logger.info("bot_initialized", bot_username=application.bot.username)
         
@@ -153,6 +159,15 @@ def main():
         application.add_handler(CommandHandler("next", next_command))
         application.add_handler(CommandHandler("report", report_command))
         application.add_handler(CommandHandler("profile", profile_command))
+        application.add_handler(CommandHandler("rating", rating_command))
+        
+        # Register feedback callback handler
+        application.add_handler(
+            CallbackQueryHandler(
+                feedback_callback,
+                pattern="^feedback_(positive|negative|skip)$",
+            )
+        )
         
         # Register profile editing conversation handler
         profile_conv_handler = ConversationHandler(

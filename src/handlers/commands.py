@@ -17,6 +17,10 @@ from src.services.preferences import (
     validate_country_filter,
     GENDER_FILTERS,
 )
+from src.services.feedback import (
+    FeedbackManager,
+    get_feedback_prompt,
+)
 from src.utils.decorators import rate_limit
 from src.utils.logger import get_logger
 
@@ -41,6 +45,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/profile - View your profile\n"
         "/editprofile - Create/edit your profile\n"
         "/preferences - Set matching filters\n"
+        "/rating - View your rating\n"
         "/chat - Start searching for a partner\n"
         "/stop - End current chat\n"
         "/next - Skip to next partner\n"
@@ -48,6 +53,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔒 Your identity remains completely anonymous.\n"
         "💡 Create your profile first with /editprofile!\n"
         "⚙️ Customize matching with /preferences!\n"
+        "⭐ Rate partners to improve matching!\n"
         "Ready to start? Use /chat to find a partner!"
     )
     
@@ -73,12 +79,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "3️⃣ Use /chat to enter the waiting queue\n"
         "4️⃣ Once matched, start chatting with your partner\n"
         "5️⃣ Send text, photos, videos, stickers, voice notes\n"
-        "6️⃣ Use /next to skip to a new partner\n"
-        "7️⃣ Use /stop to end the chat\n\n"
+        "6️⃣ Rate your partner after chatting (👍/👎)\n"
+        "7️⃣ Use /next to skip to a new partner\n"
+        "8️⃣ Use /stop to end the chat\n\n"
         "📋 **All Commands:**\n"
         "/profile - View your profile\n"
         "/editprofile - Edit your profile\n"
         "/preferences - Set matching filters\n"
+        "/rating - View your rating\n"
         "/chat - Find a partner\n"
         "/stop - End chat\n"
         "/next - Skip to next\n"
@@ -87,7 +95,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ **Rules:**\n"
         "• Be respectful and kind\n"
         "• No spam or abuse\n"
+        "• Rate partners honestly\n"
         "• Report issues with /report\n\n"
+        "💡 **Rating System:**\n"
+        "• Good ratings help you match faster\n"
+        "• Toxic users are auto-limited\n"
+        "• View your rating with /rating\n\n"
         "🔒 All chats are anonymous and private.\n"
         "Your personal information is never shared."
     )
@@ -207,14 +220,21 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Please try again in a few moments."
         )
     except Exception as e:
-        logger.error(
-            "chat_command_error",
-            user_id=user_id,
-            error=str(e),
-        )
-        await update.message.reply_text(
-            "❌ An error occurred. Please try again."
-        )
+        # Check if this is a user limitation error
+        error_msg = str(e)
+        if "limited" in error_msg.lower() or "rating" in error_msg.lower():
+            await update.message.reply_text(
+                f"⚠️ {error_msg}"
+            )
+        else:
+            logger.error(
+                "chat_command_error",
+                user_id=user_id,
+                error=error_msg,
+            )
+            await update.message.reply_text(
+                "❌ An error occurred. Please try again."
+            )
 
 
 async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -244,6 +264,9 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
             )
             
+            # Show feedback prompt
+            await show_feedback_prompt(context, user_id, partner_id)
+            
             # Notify partner
             try:
                 await context.bot.send_message(
@@ -252,6 +275,10 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "Use /chat to find a new partner!",
                     parse_mode="Markdown",
                 )
+                
+                # Show feedback prompt to partner as well
+                await show_feedback_prompt(context, partner_id, user_id)
+                
             except Exception as e:
                 logger.warning(
                     "partner_notification_failed",
@@ -298,6 +325,9 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
+        # Show feedback prompt for previous partner
+        await show_feedback_prompt(context, user_id, partner_id)
+        
         # Notify previous partner
         try:
             await context.bot.send_message(
@@ -306,6 +336,10 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Use /chat to find a new partner!",
                 parse_mode="Markdown",
             )
+            
+            # Show feedback prompt to partner as well
+            await show_feedback_prompt(context, partner_id, user_id)
+            
         except Exception as e:
             logger.warning(
                 "partner_notification_failed",
@@ -947,4 +981,178 @@ async def cancel_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data.clear()
     logger.info("preferences_editing_cancelled", user_id=update.effective_user.id)
     return ConversationHandler.END
+
+
+# ============ FEEDBACK HANDLERS ============
+
+
+async def show_feedback_prompt(
+    context: ContextTypes.DEFAULT_TYPE,
+    user_id: int,
+    partner_id: int,
+):
+    """
+    Show feedback prompt to user after chat ends.
+    
+    Args:
+        context: Bot context
+        user_id: User to show prompt to
+        partner_id: Partner who was just chatted with
+    """
+    try:
+        # Store partner_id in user context for feedback callback
+        # Note: We use bot-level storage since user_data is per-handler
+        feedback_key = f"pending_feedback:{user_id}"
+        redis = context.bot_data["redis"]
+        
+        # Store partner_id for 5 minutes
+        await redis.set(feedback_key, str(partner_id), ex=300)
+        
+        # Get feedback prompt
+        message_text, keyboard_data = get_feedback_prompt()
+        
+        # Convert to InlineKeyboardMarkup
+        keyboard = [
+            [InlineKeyboardButton(btn["text"], callback_data=btn["callback_data"]) for btn in row]
+            for row in keyboard_data
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            user_id,
+            message_text,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        
+        logger.info("feedback_prompt_shown", user_id=user_id, partner_id=partner_id)
+        
+    except Exception as e:
+        logger.error(
+            "feedback_prompt_error",
+            user_id=user_id,
+            partner_id=partner_id,
+            error=str(e),
+        )
+
+
+async def feedback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle feedback button callbacks."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    callback_data = query.data
+    
+    try:
+        # Get partner_id from storage
+        feedback_key = f"pending_feedback:{user_id}"
+        redis = context.bot_data["redis"]
+        partner_data = await redis.get(feedback_key)
+        
+        if not partner_data:
+            await query.edit_message_text(
+                "⏰ Feedback session expired. You can rate your next partner!"
+            )
+            return
+        
+        partner_id = int(partner_data.decode())
+        
+        # Handle skip
+        if callback_data == "feedback_skip":
+            await redis.delete(feedback_key)
+            await query.edit_message_text(
+                "⏭️ Rating skipped.\n\n"
+                "Use /chat to find a new partner!"
+            )
+            logger.info("feedback_skipped", user_id=user_id, partner_id=partner_id)
+            return
+        
+        # Process rating
+        feedback_manager: FeedbackManager = context.bot_data.get("feedback_manager")
+        if not feedback_manager:
+            await query.edit_message_text(
+                "❌ Feedback system unavailable. Please try again later."
+            )
+            return
+        
+        is_positive = callback_data == "feedback_positive"
+        
+        # Record feedback
+        recorded = await feedback_manager.record_feedback(
+            rater_id=user_id,
+            rated_user_id=partner_id,
+            is_positive=is_positive,
+        )
+        
+        if recorded:
+            # Clean up pending feedback
+            await redis.delete(feedback_key)
+            
+            # Get updated rating for display
+            partner_rating = await feedback_manager.get_rating(partner_id)
+            
+            rating_emoji = "👍" if is_positive else "👎"
+            
+            await query.edit_message_text(
+                f"✅ {rating_emoji} **Feedback recorded!**\n\n"
+                f"Thank you for helping improve the community.\n"
+                f"Partner's new score: {partner_rating.rating_score:.1f}%\n\n"
+                f"Use /chat to find a new partner!",
+                parse_mode="Markdown",
+            )
+            
+            logger.info(
+                "feedback_recorded",
+                user_id=user_id,
+                partner_id=partner_id,
+                is_positive=is_positive,
+            )
+        else:
+            await query.edit_message_text(
+                "ℹ️ You've already rated this partner.\n\n"
+                "Use /chat to find a new partner!"
+            )
+    
+    except Exception as e:
+        logger.error(
+            "feedback_callback_error",
+            user_id=user_id,
+            error=str(e),
+        )
+        await query.edit_message_text(
+            "❌ Failed to record feedback. Please try again."
+        )
+
+
+async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /rating command - show user's rating."""
+    user_id = update.effective_user.id
+    feedback_manager: FeedbackManager = context.bot_data.get("feedback_manager")
+    
+    if not feedback_manager:
+        await update.message.reply_text(
+            "❌ Rating system is not available."
+        )
+        return
+    
+    try:
+        rating = await feedback_manager.get_rating(user_id)
+        
+        await update.message.reply_text(
+            f"📊 **Your Rating**\n\n"
+            f"{rating.to_display()}\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"💡 Be respectful to improve your rating!\n"
+            f"Good ratings help you match faster.",
+            parse_mode="Markdown",
+        )
+        
+        logger.info("rating_viewed", user_id=user_id, score=rating.rating_score)
+        
+    except Exception as e:
+        logger.error("rating_command_error", user_id=user_id, error=str(e))
+        await update.message.reply_text(
+            "❌ Failed to load rating. Please try again."
+        )
 
