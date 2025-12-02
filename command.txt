@@ -40,3 +40,20 @@ Examples:
 /registrations      
 /registrations on   
 /registrations off  
+
+/forcelogout
+/resetqueue
+
+
+3
+6
+broadcast message Users with specific preferences (e.g., gender M, country India)
+- Message types:
+    - Text
+    - Photo
+    - Buttons
+    - Inline menus
+    - Ads (if monetizing)
+
+- /matchstatus
+    - /queue

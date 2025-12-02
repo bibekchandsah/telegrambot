@@ -1974,6 +1974,9 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "**Bot Control Commands:**\n"
         "/maintenance [on/off] - Toggle maintenance mode\n"
         "/registrations [on/off] - Toggle new registrations\n\n"
+        "**Critical Actions:**\n"
+        "/forcelogout confirm - Disconnect all users\n"
+        "/resetqueue confirm - Clear matching queue\n\n"
         "**Broadcast Commands:**\n"
         "/broadcast - Send message to all users\n"
         "/broadcastactive - Send to active users only\n\n"
@@ -3340,6 +3343,202 @@ async def registrations_command(update: Update, context: ContextTypes.DEFAULT_TY
     
     except Exception as e:
         logger.error("registrations_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def forcelogout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /forcelogout command - disconnect all active users and clear sessions."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    matching = context.bot_data.get("matching")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client or not matching:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    # Confirmation required
+    if not context.args or context.args[0].lower() != 'confirm':
+        await update.message.reply_text(
+            "⚠️ **CRITICAL ACTION WARNING**\n\n"
+            "This command will:\n"
+            "• Disconnect ALL active chats\n"
+            "• Clear ALL queue entries\n"
+            "• Reset ALL user states\n\n"
+            "To proceed, use:\n"
+            "`/forcelogout confirm`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        # Get all active chat pairs
+        pair_keys = await redis_client.keys("pair:*")
+        chat_count = len(pair_keys)
+        
+        disconnected_users = set()
+        
+        # End all active chats
+        for pair_key in pair_keys:
+            if isinstance(pair_key, bytes):
+                pair_key = pair_key.decode('utf-8')
+            
+            user_id_str = pair_key.split(':')[1]
+            user_id_int = int(user_id_str)
+            partner_id_bytes = await redis_client.get(pair_key)
+            
+            if partner_id_bytes:
+                partner_id = int(partner_id_bytes.decode('utf-8') if isinstance(partner_id_bytes, bytes) else partner_id_bytes)
+                disconnected_users.add(user_id_int)
+                disconnected_users.add(partner_id)
+                
+                # Notify users
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id_int,
+                        text="⚠️ **Chat forcefully ended by admin**\n\nAll active sessions have been disconnected.\nUse /chat to start a new conversation.",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+                
+                try:
+                    await context.bot.send_message(
+                        chat_id=partner_id,
+                        text="⚠️ **Chat forcefully ended by admin**\n\nAll active sessions have been disconnected.\nUse /chat to start a new conversation.",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+        
+        # Delete all pair keys
+        if pair_keys:
+            await redis_client.delete(*pair_keys)
+        
+        # Delete all state keys
+        state_keys = await redis_client.keys("state:*")
+        if state_keys:
+            await redis_client.delete(*state_keys)
+        
+        # Delete all activity timestamps
+        activity_keys = await redis_client.keys("chat:activity:*")
+        if activity_keys:
+            await redis_client.delete(*activity_keys)
+        
+        # Remove all users from queue (queue:waiting list)
+        queue_users = await redis_client.lrange("queue:waiting", 0, -1)
+        queue_count = len(queue_users)
+        if queue_count > 0:
+            await redis_client.delete("queue:waiting")
+        
+        logger.info(
+            "force_logout_executed",
+            admin_id=user_id,
+            chats_ended=chat_count,
+            queue_cleared=queue_count,
+            users_affected=len(disconnected_users)
+        )
+        
+        await update.message.reply_text(
+            f"✅ **Force Logout Complete**\n\n"
+            f"• Disconnected: {chat_count} active chats\n"
+            f"• Queue cleared: {queue_count} waiting users\n"
+            f"• Total affected: {len(disconnected_users)} users\n\n"
+            f"All users have been notified.",
+            parse_mode="Markdown"
+        )
+    
+    except Exception as e:
+        logger.error("forcelogout_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def resetqueue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /resetqueue command - clear all users from matching queue."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    # Confirmation required
+    if not context.args or context.args[0].lower() != 'confirm':
+        await update.message.reply_text(
+            "⚠️ **CRITICAL ACTION WARNING**\n\n"
+            "This command will:\n"
+            "• Remove ALL users from the matching queue\n"
+            "• Reset queue states to IDLE\n\n"
+            "To proceed, use:\n"
+            "`/resetqueue confirm`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        # Get all users from the queue:waiting list
+        queue_users = await redis_client.lrange("queue:waiting", 0, -1)
+        queue_count = len(queue_users)
+        
+        removed_users = []
+        for user_id_bytes in queue_users:
+            if isinstance(user_id_bytes, bytes):
+                user_id_str = user_id_bytes.decode('utf-8')
+            else:
+                user_id_str = str(user_id_bytes)
+            
+            try:
+                uid = int(user_id_str)
+                removed_users.append(uid)
+                
+                # Notify user
+                await context.bot.send_message(
+                    chat_id=uid,
+                    text="⚠️ **Removed from queue by admin**\n\nThe matching queue has been reset.\nUse /chat to search for a partner again.",
+                    parse_mode="Markdown"
+                )
+            except ValueError:
+                logger.warning("invalid_user_id_in_queue", user_id=user_id_str)
+            except Exception as e:
+                logger.debug("notify_user_failed", user_id=user_id_str, error=str(e))
+        
+        # Clear the queue:waiting list
+        await redis_client.delete("queue:waiting")
+        
+        # Reset states
+        for uid in removed_users:
+            state_key = f"state:{uid}"
+            await redis_client.set(state_key, "IDLE")
+        
+        logger.info(
+            "reset_queue_executed",
+            admin_id=user_id,
+            users_removed=queue_count
+        )
+        
+        await update.message.reply_text(
+            f"✅ **Queue Reset Complete**\n\n"
+            f"• Removed: {queue_count} waiting users\n"
+            f"• All users notified\n"
+            f"• Queue states reset to IDLE",
+            parse_mode="Markdown"
+        )
+    
+    except Exception as e:
+        logger.error("resetqueue_command_error", error=str(e))
         await update.message.reply_text("❌ An error occurred.")
 
 

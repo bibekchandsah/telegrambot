@@ -71,6 +71,8 @@ from src.handlers.commands import (
     badwords_command,
     maintenance_command,
     registrations_command,
+    forcelogout_command,
+    resetqueue_command,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -402,6 +404,8 @@ def main():
         # Register bot control commands
         application.add_handler(CommandHandler("maintenance", maintenance_command))
         application.add_handler(CommandHandler("registrations", registrations_command))
+        application.add_handler(CommandHandler("forcelogout", forcelogout_command))
+        application.add_handler(CommandHandler("resetqueue", resetqueue_command))
         
         # Register feedback callback handler
         application.add_handler(

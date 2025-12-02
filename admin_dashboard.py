@@ -1173,43 +1173,69 @@ def update_bot_settings():
 
 @app.route('/api/settings/actions/force-logout', methods=['POST'])
 def force_logout_all():
-    """Force logout all users."""
+    """Force logout all users - disconnect all active chats and clear sessions."""
     try:
         data = request.get_json()
         admin_id = parse_admin_id(data.get('admin_id'))
         
-        redis_client, dashboard_service, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _ = get_thread_services()
         
-        # Get all active users
-        all_users = run_async(dashboard_service.get_all_users_paginated(1, 10000))
-        user_ids = [u['user_id'] for u in all_users.get('users', [])]
+        # Get all active chat pairs
+        pair_keys = run_async(redis_client.keys("pair:*"))
+        chat_count = len(pair_keys)
         
-        # Clear all active sessions
-        logout_count = 0
-        for user_id in user_ids:
-            # Remove from queue
-            queue_key = f"queue:{user_id}"
-            if run_async(redis_client.exists(queue_key)):
-                run_async(redis_client.delete(queue_key))
-                logout_count += 1
+        # Store partner IDs to notify
+        disconnected_users = set()
+        
+        # End all active chats
+        for pair_key in pair_keys:
+            if isinstance(pair_key, bytes):
+                pair_key = pair_key.decode('utf-8')
             
-            # Remove chat partner
-            partner_key = f"chat:{user_id}"
-            if run_async(redis_client.exists(partner_key)):
-                run_async(redis_client.delete(partner_key))
-                logout_count += 1
+            user_id = int(pair_key.split(':')[1])
+            partner_id_bytes = run_async(redis_client.get(pair_key))
+            
+            if partner_id_bytes:
+                partner_id = int(partner_id_bytes.decode('utf-8') if isinstance(partner_id_bytes, bytes) else partner_id_bytes)
+                disconnected_users.add(user_id)
+                disconnected_users.add(partner_id)
+        
+        # Delete all pair keys
+        if pair_keys:
+            run_async(redis_client.delete(*pair_keys))
+        
+        # Delete all state keys
+        state_keys = run_async(redis_client.keys("state:*"))
+        if state_keys:
+            run_async(redis_client.delete(*state_keys))
+        
+        # Delete all activity timestamps
+        activity_keys = run_async(redis_client.keys("chat:activity:*"))
+        if activity_keys:
+            run_async(redis_client.delete(*activity_keys))
+        
+        # Remove all users from queue (queue:waiting list)
+        queue_users = run_async(redis_client.lrange("queue:waiting", 0, -1))
+        queue_count = len(queue_users)
+        if queue_count > 0:
+            run_async(redis_client.delete("queue:waiting"))
         
         # Log the action
         if report_manager:
             run_async(report_manager.log_moderation_action(
                 admin_id=admin_id,
                 action="force_logout_all",
-                details=f"Forced logout of {logout_count} active sessions"
+                details=f"Disconnected {chat_count} active chats, removed {queue_count} from queue, affected {len(disconnected_users)} users"
             ))
         
         return jsonify({
             "success": True,
-            "message": f"Successfully logged out {logout_count} active sessions"
+            "message": f"Successfully disconnected {chat_count} active chats and removed {queue_count} from queue",
+            "details": {
+                "chats_ended": chat_count,
+                "queue_cleared": queue_count,
+                "users_affected": len(disconnected_users)
+            }
         })
     except Exception as e:
         logger.error("force_logout_all_error", error=str(e))
@@ -1218,35 +1244,49 @@ def force_logout_all():
 
 @app.route('/api/settings/actions/reset-queue', methods=['POST'])
 def reset_queue():
-    """Reset the entire queue."""
+    """Reset the entire matching queue."""
     try:
         data = request.get_json()
         admin_id = parse_admin_id(data.get('admin_id'))
         
         redis_client, _, _, report_manager, _ = get_thread_services()
         
-        # Get all queue keys
-        queue_keys = run_async(redis_client.keys("queue:*"))
-        queue_count = len(queue_keys)
+        # Get all users from the queue:waiting list
+        queue_users = run_async(redis_client.lrange("queue:waiting", 0, -1))
+        queue_count = len(queue_users)
         
-        # Delete all queue entries
-        if queue_keys:
-            run_async(redis_client.delete(*queue_keys))
+        removed_users = []
+        for user_id_bytes in queue_users:
+            if isinstance(user_id_bytes, bytes):
+                user_id = user_id_bytes.decode('utf-8')
+            else:
+                user_id = str(user_id_bytes)
+            removed_users.append(user_id)
         
-        # Also clear the main queue list if it exists
-        run_async(redis_client.delete("bot:queue"))
+        # Clear the queue:waiting list
+        run_async(redis_client.delete("queue:waiting"))
+        
+        # Reset queue states for affected users
+        for user_id in removed_users:
+            state_key = f"state:{user_id}"
+            current_state = run_async(redis_client.get(state_key))
+            if current_state and current_state.decode('utf-8') == "IN_QUEUE":
+                run_async(redis_client.set(state_key, "IDLE"))
         
         # Log the action
         if report_manager:
             run_async(report_manager.log_moderation_action(
                 admin_id=admin_id,
                 action="queue_reset",
-                details=f"Reset queue, removed {queue_count} entries"
+                details=f"Reset entire queue, removed {queue_count} users waiting for matches"
             ))
         
         return jsonify({
             "success": True,
-            "message": f"Queue reset successfully, removed {queue_count} entries"
+            "message": f"Queue reset successfully, removed {queue_count} waiting users",
+            "details": {
+                "users_removed": queue_count
+            }
         })
     except Exception as e:
         logger.error("reset_queue_error", error=str(e))
