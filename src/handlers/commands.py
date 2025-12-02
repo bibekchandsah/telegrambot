@@ -317,6 +317,14 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
             )
             
+            # Set initial activity timestamp for both users
+            redis_client = context.bot_data.get("redis")
+            if redis_client:
+                import time
+                current_time = int(time.time())
+                await redis_client.set(f"chat:activity:{user_id}", current_time, ex=7200)
+                await redis_client.set(f"chat:activity:{partner_id}", current_time, ex=7200)
+            
             logger.info(
                 "match_success",
                 user_id=user_id,
@@ -419,6 +427,12 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     error=str(e),
                 )
             
+            # Clean up activity timestamps
+            redis_client = context.bot_data.get("redis")
+            if redis_client:
+                await redis_client.delete(f"chat:activity:{user_id}")
+                await redis_client.delete(f"chat:activity:{partner_id}")
+            
             logger.info(
                 "chat_stopped",
                 user_id=user_id,
@@ -462,6 +476,12 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Track skip count
         if admin_manager:
             await admin_manager.increment_skip_count(user_id)
+        
+        # Clean up activity timestamps for old chat
+        redis_client = context.bot_data.get("redis")
+        if redis_client:
+            await redis_client.delete(f"chat:activity:{user_id}")
+            await redis_client.delete(f"chat:activity:{partner_id}")
         
         # Show feedback prompt for previous partner
         await show_feedback_prompt(context, user_id, partner_id)
@@ -582,6 +602,13 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 partner_match_msg,
                 parse_mode="Markdown",
             )
+            
+            # Set initial activity timestamp for new chat
+            if redis_client:
+                import time
+                current_time = int(time.time())
+                await redis_client.set(f"chat:activity:{user_id}", current_time, ex=7200)
+                await redis_client.set(f"chat:activity:{new_partner_id}", current_time, ex=7200)
             
             logger.info(
                 "next_match_success",

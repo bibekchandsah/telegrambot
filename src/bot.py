@@ -8,6 +8,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ConversationHandler,
     filters,
+    ContextTypes,
 )
 from src.config import Config
 from src.db.redis_client import redis_client
@@ -145,12 +146,133 @@ async def post_init(application: Application):
                 first=1,
                 name="notification_sender"
             )
+            # Start inactivity monitor
+            application.job_queue.run_repeating(
+                check_inactivity,
+                interval=30,  # Check every 30 seconds
+                first=10,
+                name="inactivity_monitor"
+            )
         else:
             logger.warning("job_queue_not_available", message="Install python-telegram-bot[job-queue] for background jobs")
         
     except Exception as e:
         logger.error("initialization_failed", error=str(e))
         raise
+
+
+async def check_inactivity(context: ContextTypes.DEFAULT_TYPE):
+    """Check for inactive chats and auto-disconnect."""
+    try:
+        import time
+        redis_client = context.bot_data.get("redis")
+        matching = context.bot_data.get("matching")
+        
+        if not redis_client or not matching:
+            return
+        
+        # Get inactivity duration from settings (default 300 seconds = 5 minutes)
+        inactivity_duration_bytes = await redis_client.get("bot:settings:inactivity_duration")
+        inactivity_duration = 300  # default
+        if inactivity_duration_bytes:
+            try:
+                inactivity_duration = int(inactivity_duration_bytes.decode('utf-8') if isinstance(inactivity_duration_bytes, bytes) else inactivity_duration_bytes)
+            except:
+                pass
+        
+        current_time = int(time.time())
+        
+        # Get all active pairs
+        pair_keys = await redis_client.keys("pair:*")
+        
+        for pair_key in pair_keys:
+            try:
+                if isinstance(pair_key, bytes):
+                    pair_key = pair_key.decode('utf-8')
+                
+                user_id = int(pair_key.split(':')[1])
+                partner_id_bytes = await redis_client.get(pair_key)
+                
+                if not partner_id_bytes:
+                    continue
+                
+                partner_id = int(partner_id_bytes.decode('utf-8') if isinstance(partner_id_bytes, bytes) else partner_id_bytes)
+                
+                # Get last activity times
+                user_activity_bytes = await redis_client.get(f"chat:activity:{user_id}")
+                partner_activity_bytes = await redis_client.get(f"chat:activity:{partner_id}")
+                
+                user_last_activity = None
+                partner_last_activity = None
+                
+                if user_activity_bytes:
+                    user_last_activity = int(user_activity_bytes.decode('utf-8') if isinstance(user_activity_bytes, bytes) else user_activity_bytes)
+                
+                if partner_activity_bytes:
+                    partner_last_activity = int(partner_activity_bytes.decode('utf-8') if isinstance(partner_activity_bytes, bytes) else partner_activity_bytes)
+                
+                # If no activity timestamp, this is a new chat - set it now
+                if user_last_activity is None:
+                    await redis_client.set(f"chat:activity:{user_id}", current_time, ex=7200)
+                    user_last_activity = current_time
+                
+                if partner_last_activity is None:
+                    await redis_client.set(f"chat:activity:{partner_id}", current_time, ex=7200)
+                    partner_last_activity = current_time
+                
+                # Check if either user has been inactive too long
+                user_inactive_time = current_time - user_last_activity
+                partner_inactive_time = current_time - partner_last_activity
+                
+                # Get the longest inactivity time (both users need to be inactive)
+                max_inactive_time = min(user_inactive_time, partner_inactive_time)
+                
+                if max_inactive_time >= inactivity_duration:
+                    # Auto-disconnect due to inactivity
+                    logger.info(
+                        "auto_disconnect_inactivity",
+                        user_id=user_id,
+                        partner_id=partner_id,
+                        inactive_seconds=max_inactive_time
+                    )
+                    
+                    # End the chat
+                    await matching.end_chat(user_id)
+                    
+                    # Clean up activity timestamps
+                    await redis_client.delete(f"chat:activity:{user_id}")
+                    await redis_client.delete(f"chat:activity:{partner_id}")
+                    
+                    # Notify both users
+                    inactivity_msg = (
+                        "⏱️ **Chat ended due to inactivity.**\n\n"
+                        f"No messages were exchanged for {inactivity_duration // 60} minutes.\n\n"
+                        "Use /chat to find a new partner!"
+                    )
+                    
+                    try:
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=inactivity_msg,
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.debug("notify_user_failed", user_id=user_id, error=str(e))
+                    
+                    try:
+                        await context.bot.send_message(
+                            chat_id=partner_id,
+                            text=inactivity_msg,
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.debug("notify_partner_failed", partner_id=partner_id, error=str(e))
+                
+            except Exception as e:
+                logger.debug("check_pair_inactivity_error", pair_key=pair_key, error=str(e))
+        
+    except Exception as e:
+        logger.error("inactivity_check_error", error=str(e))
 
 
 async def send_pending_notifications(context: ContextTypes.DEFAULT_TYPE):

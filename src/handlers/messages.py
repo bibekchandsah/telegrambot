@@ -79,6 +79,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.debug("user_info_storage_failed", user_id=sender_id, error=str(e))
     
     try:
+        # Update last activity timestamp for both users
+        redis_client = context.bot_data.get("redis")
+        if redis_client:
+            import time
+            current_time = int(time.time())
+            await redis_client.set(f"chat:activity:{sender_id}", current_time, ex=7200)  # 2 hour expiry
+        
         # Mark sender as typing (for the partner to see)
         if activity_manager:
             await activity_manager.set_typing(sender_id)
@@ -92,6 +99,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Use /chat to find a partner!"
             )
             return
+        
+        # Update partner's activity timestamp as well (they're receiving a message)
+        if redis_client:
+            current_time = int(time.time())
+            await redis_client.set(f"chat:activity:{partner_id}", current_time, ex=7200)
         
         # Determine message type
         media_type = None
