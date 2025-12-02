@@ -63,12 +63,79 @@ async def get_custom_message(context: ContextTypes.DEFAULT_TYPE, message_key: st
     return default
 
 
+async def check_maintenance_mode(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+    """Check if bot is in maintenance mode. Returns True if maintenance is active (and user is not admin)."""
+    try:
+        redis_client: RedisClient = context.bot_data.get("redis")
+        admin_manager: AdminManager = context.bot_data.get("admin_manager")
+        
+        # Check if user is admin
+        if admin_manager and admin_manager.is_admin(user_id):
+            return False  # Admins can always use the bot
+        
+        if redis_client:
+            maintenance_bytes = await redis_client.get("bot:settings:maintenance_mode")
+            if maintenance_bytes:
+                maintenance_mode = bool(int(maintenance_bytes.decode('utf-8') if isinstance(maintenance_bytes, bytes) else maintenance_bytes))
+                return maintenance_mode
+    except Exception as e:
+        logger.error("check_maintenance_error", error=str(e))
+    return False
+
+
+async def check_registrations_enabled(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if new user registrations are enabled."""
+    try:
+        redis_client: RedisClient = context.bot_data.get("redis")
+        if redis_client:
+            reg_bytes = await redis_client.get("bot:settings:registrations_enabled")
+            if reg_bytes is not None:
+                return bool(int(reg_bytes.decode('utf-8') if isinstance(reg_bytes, bytes) else reg_bytes))
+    except Exception as e:
+        logger.error("check_registrations_error", error=str(e))
+    return True  # Default to enabled
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
     user = update.effective_user
+    redis_client: RedisClient = context.bot_data.get("redis")
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    # Check maintenance mode
+    if await check_maintenance_mode(context, user.id):
+        await update.message.reply_text(
+            "🔧 **Bot is under maintenance**\n\n"
+            "We're currently performing system maintenance.\n"
+            "Please try again later.\n\n"
+            "Thank you for your patience!",
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Check if user is new (not registered)
+    is_new_user = False
+    if redis_client:
+        user_exists = await redis_client.exists(f"user:{user.id}:info")
+        is_new_user = not user_exists
+    
+    # Check if registrations are enabled for new users
+    if is_new_user:
+        registrations_enabled = await check_registrations_enabled(context)
+        if not registrations_enabled:
+            # Check if user is admin
+            is_admin = admin_manager and admin_manager.is_admin(user.id)
+            if not is_admin:
+                await update.message.reply_text(
+                    "🚫 **New registrations are currently disabled**\n\n"
+                    "We're not accepting new users at this time.\n"
+                    "Please check back later.\n\n"
+                    "Thank you for your understanding!",
+                    parse_mode="Markdown"
+                )
+                return
     
     # Register user for broadcast
-    admin_manager: AdminManager = context.bot_data.get("admin_manager")
     if admin_manager:
         await admin_manager.register_user(
             user.id,
@@ -115,6 +182,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /help command."""
+    user_id = update.effective_user.id
+    
+    # Check maintenance mode
+    if await check_maintenance_mode(context, user_id):
+        await update.message.reply_text(
+            "🔧 **Bot is under maintenance**\n\n"
+            "We're currently performing system maintenance.\n"
+            "Please try again later.",
+            parse_mode="Markdown"
+        )
+        return
+    
     help_message = (
         "📚 **How to use this bot:**\n\n"
         "1️⃣ Create your profile with /editprofile\n"
@@ -169,6 +248,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /chat command - join queue and find partner."""
     user_id = update.effective_user.id
+    
+    # Check maintenance mode
+    if await check_maintenance_mode(context, user_id):
+        await update.message.reply_text(
+            "🔧 **Bot is under maintenance**\n\n"
+            "We're currently performing system maintenance.\n"
+            "Chat functionality is temporarily disabled.\n\n"
+            "Please try again later.",
+            parse_mode="Markdown"
+        )
+        return
+    
     matching: MatchingEngine = context.bot_data["matching"]
     preference_manager: PreferenceManager = context.bot_data.get("preference_manager")
     admin_manager: AdminManager = context.bot_data.get("admin_manager")
@@ -873,6 +964,18 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def editprofile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /editprofile command - start profile creation/editing."""
     user_id = update.effective_user.id
+    
+    # Check maintenance mode
+    if await check_maintenance_mode(context, user_id):
+        await update.message.reply_text(
+            "🔧 **Bot is under maintenance**\n\n"
+            "We're currently performing system maintenance.\n"
+            "Profile editing is temporarily disabled.\n\n"
+            "Please try again later.",
+            parse_mode="Markdown"
+        )
+        return ConversationHandler.END
+    
     profile_manager: ProfileManager = context.bot_data.get("profile_manager")
     
     # Handle both callback queries and regular messages
@@ -1146,6 +1249,18 @@ async def preferences_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     Entry point for preferences conversation.
     """
     user_id = update.effective_user.id
+    
+    # Check maintenance mode
+    if await check_maintenance_mode(context, user_id):
+        await update.message.reply_text(
+            "🔧 **Bot is under maintenance**\n\n"
+            "We're currently performing system maintenance.\n"
+            "Preferences settings are temporarily disabled.\n\n"
+            "Please try again later.",
+            parse_mode="Markdown"
+        )
+        return ConversationHandler.END
+    
     preference_manager: PreferenceManager = context.bot_data.get("preference_manager")
     
     if not preference_manager:
@@ -1553,6 +1668,18 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def mediasettings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /mediasettings command - show media privacy settings."""
     user_id = update.effective_user.id
+    
+    # Check maintenance mode
+    if await check_maintenance_mode(context, user_id):
+        await update.message.reply_text(
+            "🔧 **Bot is under maintenance**\n\n"
+            "We're currently performing system maintenance.\n"
+            "Media settings are temporarily disabled.\n\n"
+            "Please try again later.",
+            parse_mode="Markdown"
+        )
+        return ConversationHandler.END
+    
     media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
     
     if not media_manager:
@@ -1844,6 +1971,9 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     admin_msg = (
         "🔐 **Admin Panel**\n\n"
+        "**Bot Control Commands:**\n"
+        "/maintenance [on/off] - Toggle maintenance mode\n"
+        "/registrations [on/off] - Toggle new registrations\n\n"
         "**Broadcast Commands:**\n"
         "/broadcast - Send message to all users\n"
         "/broadcastactive - Send to active users only\n\n"
@@ -3059,5 +3189,157 @@ async def badwords_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error("badwords_command_error", error=str(e))
         await update.message.reply_text("❌ An error occurred while fetching bad words list.")
+
+
+async def maintenance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /maintenance command - toggle maintenance mode."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    try:
+        # Check if argument provided (on/off)
+        if context.args and len(context.args) > 0:
+            arg = context.args[0].lower()
+            
+            if arg in ['on', 'enable', '1', 'true']:
+                await redis_client.set("bot:settings:maintenance_mode", 1)
+                await update.message.reply_text(
+                    "🔧 **Maintenance Mode ENABLED**\n\n"
+                    "• All user commands are now blocked\n"
+                    "• Only admins can use the bot\n"
+                    "• Users will see maintenance message\n\n"
+                    "Use `/maintenance off` to disable.",
+                    parse_mode="Markdown"
+                )
+                logger.info("maintenance_enabled", admin_id=user_id)
+                
+            elif arg in ['off', 'disable', '0', 'false']:
+                await redis_client.set("bot:settings:maintenance_mode", 0)
+                await update.message.reply_text(
+                    "✅ **Maintenance Mode DISABLED**\n\n"
+                    "• Bot is now fully operational\n"
+                    "• All users can use commands\n"
+                    "• Normal functionality restored",
+                    parse_mode="Markdown"
+                )
+                logger.info("maintenance_disabled", admin_id=user_id)
+                
+            else:
+                await update.message.reply_text(
+                    "❌ Invalid argument. Use:\n"
+                    "• `/maintenance on` - Enable maintenance\n"
+                    "• `/maintenance off` - Disable maintenance\n"
+                    "• `/maintenance` - Check current status"
+                )
+        else:
+            # Show current status
+            maintenance_bytes = await redis_client.get("bot:settings:maintenance_mode")
+            is_enabled = False
+            
+            if maintenance_bytes:
+                is_enabled = bool(int(maintenance_bytes.decode('utf-8') if isinstance(maintenance_bytes, bytes) else maintenance_bytes))
+            
+            status = "🔧 **ENABLED**" if is_enabled else "✅ **DISABLED**"
+            
+            await update.message.reply_text(
+                f"**Maintenance Mode Status:** {status}\n\n"
+                f"**Commands:**\n"
+                f"• `/maintenance on` - Enable maintenance\n"
+                f"• `/maintenance off` - Disable maintenance\n\n"
+                f"When enabled, only admins can use the bot.",
+                parse_mode="Markdown"
+            )
+    
+    except Exception as e:
+        logger.error("maintenance_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def registrations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /registrations command - toggle new user registrations."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    try:
+        # Check if argument provided (on/off)
+        if context.args and len(context.args) > 0:
+            arg = context.args[0].lower()
+            
+            if arg in ['on', 'enable', '1', 'true', 'open']:
+                await redis_client.set("bot:settings:registrations_enabled", 1)
+                await update.message.reply_text(
+                    "✅ **New Registrations ENABLED**\n\n"
+                    "• New users can now use /start\n"
+                    "• Registration is open to everyone\n"
+                    "• Existing users unaffected\n\n"
+                    "Use `/registrations off` to close registrations.",
+                    parse_mode="Markdown"
+                )
+                logger.info("registrations_enabled", admin_id=user_id)
+                
+            elif arg in ['off', 'disable', '0', 'false', 'close']:
+                await redis_client.set("bot:settings:registrations_enabled", 0)
+                await update.message.reply_text(
+                    "🚫 **New Registrations DISABLED**\n\n"
+                    "• New users cannot use /start\n"
+                    "• Registration is closed\n"
+                    "• Existing users can continue normally\n"
+                    "• Admins can still register\n\n"
+                    "Use `/registrations on` to reopen.",
+                    parse_mode="Markdown"
+                )
+                logger.info("registrations_disabled", admin_id=user_id)
+                
+            else:
+                await update.message.reply_text(
+                    "❌ Invalid argument. Use:\n"
+                    "• `/registrations on` - Enable registrations\n"
+                    "• `/registrations off` - Disable registrations\n"
+                    "• `/registrations` - Check current status"
+                )
+        else:
+            # Show current status
+            reg_bytes = await redis_client.get("bot:settings:registrations_enabled")
+            is_enabled = True  # Default to enabled
+            
+            if reg_bytes is not None:
+                is_enabled = bool(int(reg_bytes.decode('utf-8') if isinstance(reg_bytes, bytes) else reg_bytes))
+            
+            status = "✅ **OPEN**" if is_enabled else "🚫 **CLOSED**"
+            
+            await update.message.reply_text(
+                f"**New User Registrations:** {status}\n\n"
+                f"**Commands:**\n"
+                f"• `/registrations on` - Allow new users\n"
+                f"• `/registrations off` - Block new users\n\n"
+                f"When closed, only existing users and admins can use the bot.",
+                parse_mode="Markdown"
+            )
+    
+    except Exception as e:
+        logger.error("registrations_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
 
 

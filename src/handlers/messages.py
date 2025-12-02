@@ -25,6 +25,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
     admin_manager: AdminManager = context.bot_data.get("admin_manager")
     report_manager = context.bot_data.get("report_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    # Check maintenance mode (admins can still send messages)
+    if redis_client:
+        try:
+            is_admin = admin_manager and admin_manager.is_admin(sender_id)
+            if not is_admin:
+                maintenance_bytes = await redis_client.get("bot:settings:maintenance_mode")
+                if maintenance_bytes:
+                    maintenance_mode = bool(int(maintenance_bytes.decode('utf-8') if isinstance(maintenance_bytes, bytes) else maintenance_bytes))
+                    if maintenance_mode:
+                        await update.message.reply_text(
+                            "🔧 **Bot is under maintenance**\n\n"
+                            "We're currently performing system maintenance.\n"
+                            "All chat functionality is temporarily disabled.\n\n"
+                            "Please try again later.",
+                            parse_mode="Markdown"
+                        )
+                        return
+        except Exception as e:
+            logger.debug("maintenance_check_failed", error=str(e))
     
     # Check if user is banned
     if admin_manager:

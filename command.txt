@@ -29,3 +29,14 @@ Examples:
 Examples:
 /unblockmedia photo
 /unblockmedia video
+
+/addbadword
+/removebadword
+/badwords
+
+/maintenance        
+/maintenance on
+/maintenance off     
+/registrations      
+/registrations on   
+/registrations off  

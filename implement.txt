@@ -135,7 +135,7 @@ Profile contains:
     - Inline menus
     - Ads (if monetizing)
 
-7. Bot Configuration ()
+7. Bot Configuration (implemented)
 - Admin must be able to modify:
     - Bot welcome message
     - Match-found message

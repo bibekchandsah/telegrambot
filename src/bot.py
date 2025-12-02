@@ -69,6 +69,8 @@ from src.handlers.commands import (
     addbadword_command,
     removebadword_command,
     badwords_command,
+    maintenance_command,
+    registrations_command,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -396,6 +398,10 @@ def main():
         application.add_handler(CommandHandler("addbadword", addbadword_command))
         application.add_handler(CommandHandler("removebadword", removebadword_command))
         application.add_handler(CommandHandler("badwords", badwords_command))
+        
+        # Register bot control commands
+        application.add_handler(CommandHandler("maintenance", maintenance_command))
+        application.add_handler(CommandHandler("registrations", registrations_command))
         
         # Register feedback callback handler
         application.add_handler(
