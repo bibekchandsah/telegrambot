@@ -354,6 +354,77 @@ body {
     color: #333;
 }
 
+/* Moderation Styles */
+.moderation-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.moderation-section h3 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+.moderation-section .form-group textarea {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    width: 100%;
+}
+
+.moderation-section .form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+    transform: translateY(-2px);
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #333;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+    transform: translateY(-2px);
+}
+
+.status-result {
+    margin-top: 15px;
+}
+
+.status-result h4 {
+    margin-bottom: 10px;
+}
+
+.status-result p {
+    margin: 5px 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .header {

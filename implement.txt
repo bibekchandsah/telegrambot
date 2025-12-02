@@ -81,7 +81,7 @@ Profile contains:
     - View detailed user profile
     - View chat history (if stored)
 
-2. Ban / Unban System ()
+2. Ban / Unban System (implemented)
 - Admin should be able to:
     - Ban user (temporary/permanent)
     - Unban user
@@ -102,7 +102,7 @@ Profile contains:
     - Clear/get current queue size
     - Force match two specific users (debug)
 
-4. Live Monitoring
+4. Live Monitoring (partially implemented)
 - Admin must see:
     - Current active chats (list of paired users)
     - Queue length

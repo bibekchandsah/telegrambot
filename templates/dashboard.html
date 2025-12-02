@@ -62,6 +62,7 @@
             <button class="tab-button" data-tab="in-chat">In Chat</button>
             <button class="tab-button" data-tab="in-queue">In Queue</button>
             <button class="tab-button" data-tab="search">Search Users</button>
+            <button class="tab-button" data-tab="moderation">Moderation</button>
         </div>
 
         <!-- Tab Content -->
@@ -210,6 +211,136 @@
                             <tr><td colspan="5" class="no-data">Enter search criteria above</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Moderation Tab -->
+            <div id="moderation" class="tab-pane">
+                <div class="section-header">
+                    <h2>User Moderation</h2>
+                </div>
+
+                <!-- Ban User Section -->
+                <div class="moderation-section">
+                    <h3>🚫 Ban User</h3>
+                    <div class="search-form">
+                        <div class="form-group">
+                            <label>User ID:</label>
+                            <input type="text" id="ban-user-id" placeholder="Enter user ID to ban">
+                        </div>
+                        <div class="form-group">
+                            <label>Reason:</label>
+                            <select id="ban-reason">
+                                <option value="">Select reason</option>
+                                <option value="nudity">Nudity/Sexual Content</option>
+                                <option value="spam">Spam/Advertising</option>
+                                <option value="abuse">Verbal Abuse/Harassment</option>
+                                <option value="fake_reports">Fake Reports</option>
+                                <option value="harassment">Persistent Harassment</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Duration:</label>
+                            <select id="ban-duration">
+                                <option value="">Select duration</option>
+                                <option value="1h">1 Hour</option>
+                                <option value="24h">24 Hours</option>
+                                <option value="7d">7 Days</option>
+                                <option value="30d">30 Days</option>
+                                <option value="permanent">Permanent</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-danger" onclick="banUser()">🚫 Ban User</button>
+                    </div>
+                </div>
+
+                <!-- Unban User Section -->
+                <div class="moderation-section">
+                    <h3>✅ Unban User</h3>
+                    <div class="search-form">
+                        <div class="form-group">
+                            <label>User ID:</label>
+                            <input type="text" id="unban-user-id" placeholder="Enter user ID to unban">
+                        </div>
+                        <button class="btn btn-success" onclick="unbanUser()">✅ Unban User</button>
+                    </div>
+                </div>
+
+                <!-- Warn User Section -->
+                <div class="moderation-section">
+                    <h3>⚠️ Warn User</h3>
+                    <div class="search-form">
+                        <div class="form-group">
+                            <label>User ID:</label>
+                            <input type="text" id="warn-user-id" placeholder="Enter user ID to warn">
+                        </div>
+                        <div class="form-group">
+                            <label>Warning Reason:</label>
+                            <textarea id="warn-reason" placeholder="Enter warning reason" rows="3"></textarea>
+                        </div>
+                        <button class="btn btn-warning" onclick="warnUser()">⚠️ Issue Warning</button>
+                    </div>
+                </div>
+
+                <!-- Check Ban Status Section -->
+                <div class="moderation-section">
+                    <h3>🔍 Check Ban Status</h3>
+                    <div class="search-form">
+                        <div class="form-group">
+                            <label>User ID:</label>
+                            <input type="text" id="check-ban-user-id" placeholder="Enter user ID to check">
+                        </div>
+                        <button class="btn btn-primary" onclick="checkBanStatus()">🔍 Check Status</button>
+                    </div>
+                    <div id="ban-status-result" class="status-result"></div>
+                </div>
+
+                <!-- Banned Users List -->
+                <div class="moderation-section">
+                    <div class="section-header">
+                        <h3>Banned Users List</h3>
+                        <button class="btn btn-primary" onclick="loadBannedUsers()">🔄 Refresh</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>User ID</th>
+                                    <th>Reason</th>
+                                    <th>Duration</th>
+                                    <th>Banned At</th>
+                                    <th>Expires At</th>
+                                    <th>Banned By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="banned-users-table">
+                                <tr><td colspan="7" class="loading">Click Refresh to load</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Warned Users List -->
+                <div class="moderation-section">
+                    <div class="section-header">
+                        <h3>Warned Users List</h3>
+                        <button class="btn btn-primary" onclick="loadWarnedUsers()">🔄 Refresh</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>User ID</th>
+                                    <th>Warning Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="warned-users-table">
+                                <tr><td colspan="3" class="loading">Click Refresh to load</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

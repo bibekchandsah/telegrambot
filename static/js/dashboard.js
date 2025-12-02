@@ -457,3 +457,307 @@ window.onclick = function(event) {
         closeUserModal();
     }
 }
+
+// ===== MODERATION FUNCTIONS =====
+
+// Ban user
+async function banUser() {
+    const userId = document.getElementById('ban-user-id').value.trim();
+    const reason = document.getElementById('ban-reason').value;
+    const duration = document.getElementById('ban-duration').value;
+    
+    if (!userId) {
+        alert('Please enter a user ID');
+        return;
+    }
+    
+    if (!reason) {
+        alert('Please select a ban reason');
+        return;
+    }
+    
+    if (!duration) {
+        alert('Please select a ban duration');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to ban user ${userId} for ${duration}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/moderation/ban', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: parseInt(userId),
+                reason: reason,
+                duration: duration
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'User banned successfully');
+            // Clear form
+            document.getElementById('ban-user-id').value = '';
+            document.getElementById('ban-reason').value = '';
+            document.getElementById('ban-duration').value = '';
+            // Refresh banned users list
+            loadBannedUsers();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to ban user'));
+        }
+    } catch (error) {
+        console.error('Error banning user:', error);
+        alert('Error banning user. Please try again.');
+    }
+}
+
+// Unban user
+async function unbanUser() {
+    const userId = document.getElementById('unban-user-id').value.trim();
+    
+    if (!userId) {
+        alert('Please enter a user ID');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to unban user ${userId}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/moderation/unban', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: parseInt(userId)
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'User unbanned successfully');
+            // Clear form
+            document.getElementById('unban-user-id').value = '';
+            // Refresh banned users list
+            loadBannedUsers();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to unban user'));
+        }
+    } catch (error) {
+        console.error('Error unbanning user:', error);
+        alert('Error unbanning user. Please try again.');
+    }
+}
+
+// Warn user
+async function warnUser() {
+    const userId = document.getElementById('warn-user-id').value.trim();
+    const reason = document.getElementById('warn-reason').value.trim();
+    
+    if (!userId) {
+        alert('Please enter a user ID');
+        return;
+    }
+    
+    if (!reason) {
+        alert('Please enter a warning reason');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to warn user ${userId}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/moderation/warn', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: parseInt(userId),
+                reason: reason
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'Warning issued successfully');
+            // Clear form
+            document.getElementById('warn-user-id').value = '';
+            document.getElementById('warn-reason').value = '';
+            // Refresh warned users list
+            loadWarnedUsers();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to warn user'));
+        }
+    } catch (error) {
+        console.error('Error warning user:', error);
+        alert('Error warning user. Please try again.');
+    }
+}
+
+// Check ban status
+async function checkBanStatus() {
+    const userId = document.getElementById('check-ban-user-id').value.trim();
+    const resultDiv = document.getElementById('ban-status-result');
+    
+    if (!userId) {
+        alert('Please enter a user ID');
+        return;
+    }
+    
+    resultDiv.innerHTML = '<p class="loading">Checking...</p>';
+    
+    try {
+        const response = await fetch(`/api/moderation/check-ban/${userId}`);
+        const data = await response.json();
+        
+        if (data.is_banned) {
+            const expiresText = data.expires_at === 'permanent' 
+                ? 'Permanent ban' 
+                : `Expires: ${new Date(data.expires_at * 1000).toLocaleString()}`;
+            
+            resultDiv.innerHTML = `
+                <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+                    <h4 style="margin: 0 0 10px 0; color: #721c24;">🚫 User is Banned</h4>
+                    <p><strong>User ID:</strong> ${data.user_id}</p>
+                    <p><strong>Reason:</strong> ${data.reason}</p>
+                    <p><strong>Duration:</strong> ${data.duration}</p>
+                    <p><strong>Banned At:</strong> ${new Date(data.banned_at * 1000).toLocaleString()}</p>
+                    <p><strong>${expiresText}</strong></p>
+                    <p><strong>Banned By:</strong> ${data.banned_by}</p>
+                    ${data.is_auto_ban ? '<p><strong>⚠️ Auto-banned due to reports</strong></p>' : ''}
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                    <h4 style="margin: 0 0 10px 0; color: #155724;">✅ User is Not Banned</h4>
+                    <p>User ID ${userId} is not currently banned.</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error checking ban status:', error);
+        resultDiv.innerHTML = `
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+                <p>Error checking ban status. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+// Load banned users
+async function loadBannedUsers() {
+    const tbody = document.getElementById('banned-users-table');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/moderation/banned-users');
+        const data = await response.json();
+        
+        if (data.banned_users && data.banned_users.length > 0) {
+            tbody.innerHTML = data.banned_users.map(ban => {
+                const bannedAt = new Date(ban.banned_at * 1000).toLocaleString();
+                const expiresAt = ban.expires_at === 'permanent' 
+                    ? 'Permanent' 
+                    : new Date(ban.expires_at * 1000).toLocaleString();
+                
+                return `
+                    <tr>
+                        <td>${ban.user_id}</td>
+                        <td>${ban.reason}</td>
+                        <td>${ban.duration}</td>
+                        <td>${bannedAt}</td>
+                        <td>${expiresAt}</td>
+                        <td>${ban.banned_by}</td>
+                        <td>
+                            <button class="btn btn-success btn-small" onclick="quickUnban(${ban.user_id})">
+                                Unban
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="no-data">No banned users</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading banned users:', error);
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">Error loading banned users</td></tr>';
+    }
+}
+
+// Load warned users
+async function loadWarnedUsers() {
+    const tbody = document.getElementById('warned-users-table');
+    tbody.innerHTML = '<tr><td colspan="3" class="loading">Loading...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/moderation/warned-users');
+        const data = await response.json();
+        
+        if (data.warned_users && data.warned_users.length > 0) {
+            tbody.innerHTML = data.warned_users.map(user => {
+                return `
+                    <tr>
+                        <td>${user.user_id}</td>
+                        <td>${user.warning_count}</td>
+                        <td>
+                            <button class="btn btn-primary btn-small" onclick="viewUser(${user.user_id})">
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="no-data">No warned users</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading warned users:', error);
+        tbody.innerHTML = '<tr><td colspan="3" class="no-data">Error loading warned users</td></tr>';
+    }
+}
+
+// Quick unban from banned users list
+async function quickUnban(userId) {
+    if (!confirm(`Are you sure you want to unban user ${userId}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/moderation/unban', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'User unbanned successfully');
+            loadBannedUsers();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to unban user'));
+        }
+    } catch (error) {
+        console.error('Error unbanning user:', error);
+        alert('Error unbanning user. Please try again.');
+    }
+}
