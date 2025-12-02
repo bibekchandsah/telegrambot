@@ -65,6 +65,9 @@ from src.handlers.commands import (
     blockmedia_command,
     unblockmedia_command,
     blockedmedia_command,
+    addbadword_command,
+    removebadword_command,
+    badwords_command,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -268,6 +271,9 @@ def main():
         application.add_handler(CommandHandler("blockmedia", blockmedia_command))
         application.add_handler(CommandHandler("unblockmedia", unblockmedia_command))
         application.add_handler(CommandHandler("blockedmedia", blockedmedia_command))
+        application.add_handler(CommandHandler("addbadword", addbadword_command))
+        application.add_handler(CommandHandler("removebadword", removebadword_command))
+        application.add_handler(CommandHandler("badwords", badwords_command))
         
         # Register feedback callback handler
         application.add_handler(

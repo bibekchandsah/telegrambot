@@ -1731,6 +1731,10 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/blockmedia - Block a media type\n"
         "/unblockmedia - Unblock a media type\n"
         "/blockedmedia - List blocked media types\n\n"
+        "**Bad Word Filter Commands:**\n"
+        "/addbadword - Add word/phrase to filter\n"
+        "/removebadword - Remove word/phrase from filter\n"
+        "/badwords - List all filtered words\n\n"
         "**Statistics:**\n"
         "/stats - View bot statistics\n\n"
         "Use these commands responsibly."
@@ -2755,5 +2759,178 @@ async def blockedmedia_command(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         logger.error("blockedmedia_command_error", error=str(e))
         await update.message.reply_text("❌ An error occurred while fetching blocked media types.")
+
+
+async def addbadword_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /addbadword command - add a word/phrase to bad word filter."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    # Check if arguments provided
+    args = context.args
+    if len(args) < 1:
+        help_msg = (
+            "🚫 **Add Bad Word/Phrase to Filter**\n\n"
+            "**Usage:**\n"
+            "`/addbadword <word or phrase>`\n\n"
+            "**Examples:**\n"
+            "`/addbadword spam`\n"
+            "`/addbadword inappropriate phrase`\n"
+            "`/addbadword badword123`\n\n"
+            "**Note:**\n"
+            "• Not case-sensitive (matches any case)\n"
+            "• Can be a single word or multiple words\n"
+            "• Messages containing this will be blocked"
+        )
+        await update.message.reply_text(help_msg, parse_mode="Markdown")
+        return
+    
+    # Join all args to support multi-word phrases
+    word = " ".join(args).lower().strip()
+    
+    if not word:
+        await update.message.reply_text("❌ Please provide a valid word or phrase.")
+        return
+    
+    # Add the bad word
+    report_manager = context.bot_data.get("report_manager")
+    if not report_manager:
+        await update.message.reply_text("❌ Report manager not available.")
+        return
+    
+    try:
+        success = await report_manager.add_bad_word(word, user_id)
+        
+        if success:
+            await update.message.reply_text(
+                f"✅ **Bad word/phrase added successfully**\n\n"
+                f"🚫 Filtered: `{word}`\n\n"
+                f"Users sending messages with this word/phrase will be:\n"
+                f"• Blocked from sending the message\n"
+                f"• Given a warning\n"
+                f"• Logged for moderation",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text("❌ Failed to add bad word/phrase.")
+    except Exception as e:
+        logger.error("addbadword_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred while adding bad word/phrase.")
+
+
+async def removebadword_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /removebadword command - remove a word/phrase from bad word filter."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    # Check if arguments provided
+    args = context.args
+    if len(args) < 1:
+        help_msg = (
+            "✅ **Remove Bad Word/Phrase from Filter**\n\n"
+            "**Usage:**\n"
+            "`/removebadword <word or phrase>`\n\n"
+            "**Examples:**\n"
+            "`/removebadword spam`\n"
+            "`/removebadword inappropriate phrase`\n\n"
+            "Use `/badwords` to see all filtered words."
+        )
+        await update.message.reply_text(help_msg, parse_mode="Markdown")
+        return
+    
+    # Join all args to support multi-word phrases
+    word = " ".join(args).lower().strip()
+    
+    if not word:
+        await update.message.reply_text("❌ Please provide a valid word or phrase.")
+        return
+    
+    # Remove the bad word
+    report_manager = context.bot_data.get("report_manager")
+    if not report_manager:
+        await update.message.reply_text("❌ Report manager not available.")
+        return
+    
+    try:
+        success = await report_manager.remove_bad_word(word, user_id)
+        
+        if success:
+            await update.message.reply_text(
+                f"✅ **Bad word/phrase removed successfully**\n\n"
+                f"🔓 Unfiltered: `{word}`\n\n"
+                f"This word/phrase is no longer blocked.",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ Word/phrase not found in filter.\n\n"
+                f"Use `/badwords` to see all filtered words."
+            )
+    except Exception as e:
+        logger.error("removebadword_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred while removing bad word/phrase.")
+
+
+async def badwords_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /badwords command - list all bad words in filter."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    report_manager = context.bot_data.get("report_manager")
+    if not report_manager:
+        await update.message.reply_text("❌ Report manager not available.")
+        return
+    
+    try:
+        bad_words = await report_manager.get_bad_words()
+        
+        if not bad_words:
+            await update.message.reply_text(
+                "✅ No bad words/phrases are currently filtered.\n\n"
+                "Use `/addbadword <word>` to add one."
+            )
+            return
+        
+        # Sort words alphabetically
+        bad_words = sorted(bad_words)
+        
+        message = f"🚫 **Bad Word Filter** ({len(bad_words)} total)\n\n"
+        
+        # Group by first letter for better organization
+        current_letter = ""
+        for word in bad_words:
+            first_letter = word[0].upper() if word else "?"
+            if first_letter != current_letter:
+                current_letter = first_letter
+                message += f"\n**{current_letter}**\n"
+            message += f"• `{word}`\n"
+        
+        message += f"\n**Commands:**\n"
+        message += f"• `/addbadword <word>` - Add new word\n"
+        message += f"• `/removebadword <word>` - Remove word"
+        
+        await update.message.reply_text(message, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error("badwords_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred while fetching bad words list.")
 
 

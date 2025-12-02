@@ -94,7 +94,7 @@ Profile contains:
         - Fake reports
         - Harassment
 
-3. Matching Control
+3. Matching Control (optional)
 - Admin should control:
     - Turn matching on/off
     - Enable/disable gender filter
@@ -111,18 +111,18 @@ Profile contains:
     - Failed message forwarding logs
     - Usage heatmap by hour/time/day
 
-5. Report & Safety Management ()
+5. Report & Safety Management (implemented)
 - Admin should manage:
     - View all user reports
     - Flags (Nudity, Harassment, Ad, Scam)
     - Auto report scoring
     - Approve/Reject user reports
-    - Freeze toxic users
+    - block toxic users
     - Block certain media types temporarily
     - Add words to bad-word filter
     - Real-time content moderation logs
 
-6. Broadcast Tools
+6. Broadcast Tools (partially implemented)
 - Admin should broadcast message to:
     - All users
     - Online users
@@ -135,7 +135,7 @@ Profile contains:
     - Inline menus
     - Ads (if monetizing)
 
-7. Bot Configuration
+7. Bot Configuration 
 - Admin must be able to modify:
     - Bot welcome message
     - Match-found message

@@ -148,6 +148,50 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
         
+        # Check for bad words in text messages and captions
+        if report_manager:
+            text_to_check = None
+            if update.message.text:
+                text_to_check = update.message.text
+            elif update.message.caption:
+                text_to_check = update.message.caption
+            
+            if text_to_check:
+                contains_bad_word = await report_manager.contains_bad_word(text_to_check)
+                if contains_bad_word:
+                    # Get bad words list to show which words are filtered
+                    bad_words = await report_manager.get_bad_words()
+                    filtered_words = [word for word in bad_words if word in text_to_check.lower()]
+                    
+                    await update.message.reply_text(
+                        "⚠️ **Message Blocked - Inappropriate Content**\n\n"
+                        "Your message contains words or phrases that violate our community guidelines.\n\n"
+                        "🚫 **Detected:** " + ", ".join(f"`{word}`" for word in filtered_words[:3]) + "\n\n"
+                        "⚡ **Warning:** Repeated violations may result in:\n"
+                        "• Temporary restrictions\n"
+                        "• Account warnings\n"
+                        "• Permanent ban\n\n"
+                        "💡 Please communicate respectfully and follow our rules.",
+                        parse_mode="Markdown"
+                    )
+                    
+                    # Increment warning count
+                    if admin_manager:
+                        await admin_manager.add_warning(
+                            user_id=sender_id,
+                            warned_by=0,  # System warning
+                            reason="Bad word usage"
+                        )
+                    
+                    # Log the violation
+                    logger.warning(
+                        "bad_word_detected",
+                        user_id=sender_id,
+                        words=filtered_words,
+                        message_preview=text_to_check[:50]
+                    )
+                    return
+        
         # Show typing indicator to partner
         try:
             await context.bot.send_chat_action(
