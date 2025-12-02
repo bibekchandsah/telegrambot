@@ -265,6 +265,9 @@ class AdminManager:
             # Increment report count
             count_key = f"stats:{reported_user_id}:report_count"
             await self.redis.incr(count_key)
+            
+            # Check for auto-ban threshold
+            await self.check_auto_ban_threshold(reported_user_id)
         except Exception as e:
             logger.error("record_report_error", reported_user_id=reported_user_id, error=str(e))
     
@@ -511,3 +514,374 @@ class AdminManager:
             
         except Exception as e:
             logger.error("record_broadcast_error", error=str(e))
+    
+    # ============================================
+    # BAN / UNBAN SYSTEM
+    # ============================================
+    
+    async def ban_user(
+        self,
+        user_id: int,
+        banned_by: int,
+        reason: str,
+        duration: Optional[int] = None,
+        is_auto_ban: bool = False,
+    ) -> bool:
+        """
+        Ban a user (temporary or permanent).
+        
+        Args:
+            user_id: User to ban
+            banned_by: Admin who banned the user
+            reason: Ban reason (nudity, spam, abuse, fake_reports, harassment)
+            duration: Ban duration in seconds (None for permanent)
+            is_auto_ban: Whether this is an automatic ban from reports
+            
+        Returns:
+            True if ban was successful
+        """
+        try:
+            import time
+            import json
+            
+            timestamp = int(time.time())
+            expires_at = timestamp + duration if duration else None
+            
+            ban_data = {
+                "user_id": user_id,
+                "banned_by": banned_by,
+                "reason": reason,
+                "banned_at": timestamp,
+                "expires_at": expires_at,
+                "is_permanent": expires_at is None,
+                "is_auto_ban": is_auto_ban,
+            }
+            
+            # Store ban info
+            ban_key = f"ban:{user_id}"
+            await self.redis.set(
+                ban_key,
+                json.dumps(ban_data),
+                ex=duration if duration else None,  # Auto-expire for temporary bans
+            )
+            
+            # Add to banned users set
+            await self.redis.sadd("bot:banned_users", str(user_id))
+            
+            # Store ban history
+            history_key = f"ban_history:{user_id}"
+            await self.redis.lpush(history_key, json.dumps(ban_data))
+            await self.redis.ltrim(history_key, 0, 49)  # Keep last 50 bans
+            
+            # Remove from warning list if present
+            await self.redis.srem("bot:warning_list", str(user_id))
+            
+            logger.info(
+                "user_banned",
+                user_id=user_id,
+                banned_by=banned_by,
+                reason=reason,
+                duration=duration,
+                is_auto_ban=is_auto_ban,
+            )
+            
+            return True
+            
+        except Exception as e:
+            logger.error("ban_user_error", user_id=user_id, error=str(e))
+            return False
+    
+    async def unban_user(self, user_id: int, unbanned_by: int) -> bool:
+        """
+        Unban a user.
+        
+        Args:
+            user_id: User to unban
+            unbanned_by: Admin who unbanned the user
+            
+        Returns:
+            True if unban was successful
+        """
+        try:
+            import time
+            import json
+            
+            # Remove ban info
+            ban_key = f"ban:{user_id}"
+            await self.redis.delete(ban_key)
+            
+            # Remove from banned users set
+            await self.redis.srem("bot:banned_users", str(user_id))
+            
+            # Record unban in history
+            unban_data = {
+                "user_id": user_id,
+                "unbanned_by": unbanned_by,
+                "unbanned_at": int(time.time()),
+            }
+            
+            history_key = f"unban_history:{user_id}"
+            await self.redis.lpush(history_key, json.dumps(unban_data))
+            await self.redis.ltrim(history_key, 0, 49)  # Keep last 50 unbans
+            
+            logger.info(
+                "user_unbanned",
+                user_id=user_id,
+                unbanned_by=unbanned_by,
+            )
+            
+            return True
+            
+        except Exception as e:
+            logger.error("unban_user_error", user_id=user_id, error=str(e))
+            return False
+    
+    async def is_user_banned(self, user_id: int) -> tuple[bool, Optional[Dict]]:
+        """
+        Check if user is banned.
+        
+        Args:
+            user_id: User to check
+            
+        Returns:
+            (is_banned, ban_data) - ban_data is None if not banned
+        """
+        try:
+            import json
+            
+            ban_key = f"ban:{user_id}"
+            ban_data_bytes = await self.redis.get(ban_key)
+            
+            if not ban_data_bytes:
+                return False, None
+            
+            ban_data = json.loads(ban_data_bytes.decode('utf-8'))
+            
+            # Check if temporary ban has expired
+            if ban_data.get("expires_at"):
+                import time
+                if time.time() > ban_data["expires_at"]:
+                    # Ban expired, remove it
+                    await self.unban_user(user_id, 0)  # System unban
+                    return False, None
+            
+            return True, ban_data
+            
+        except Exception as e:
+            logger.error("is_user_banned_error", user_id=user_id, error=str(e))
+            return False, None
+    
+    async def add_warning(self, user_id: int, warned_by: int, reason: str) -> int:
+        """
+        Add a warning to a user.
+        
+        Args:
+            user_id: User to warn
+            warned_by: Admin who issued the warning
+            reason: Warning reason
+            
+        Returns:
+            Total number of warnings for this user
+        """
+        try:
+            import time
+            import json
+            
+            warning_data = {
+                "user_id": user_id,
+                "warned_by": warned_by,
+                "reason": reason,
+                "warned_at": int(time.time()),
+            }
+            
+            # Store warning
+            warning_key = f"warnings:{user_id}"
+            await self.redis.lpush(warning_key, json.dumps(warning_data))
+            await self.redis.ltrim(warning_key, 0, 99)  # Keep last 100 warnings
+            
+            # Increment warning count
+            count_key = f"warning_count:{user_id}"
+            warning_count = await self.redis.incr(count_key)
+            
+            # Add to warning list
+            await self.redis.sadd("bot:warning_list", str(user_id))
+            
+            logger.info(
+                "warning_added",
+                user_id=user_id,
+                warned_by=warned_by,
+                reason=reason,
+                total_warnings=warning_count,
+            )
+            
+            return warning_count
+            
+        except Exception as e:
+            logger.error("add_warning_error", user_id=user_id, error=str(e))
+            return 0
+    
+    async def get_warning_count(self, user_id: int) -> int:
+        """
+        Get total warning count for a user.
+        
+        Args:
+            user_id: User to check
+            
+        Returns:
+            Warning count
+        """
+        try:
+            count_key = f"warning_count:{user_id}"
+            count = await self.redis.get(count_key)
+            return int(count) if count else 0
+        except Exception as e:
+            logger.error("get_warning_count_error", user_id=user_id, error=str(e))
+            return 0
+    
+    async def is_on_warning_list(self, user_id: int) -> bool:
+        """
+        Check if user is on the warning list.
+        
+        Args:
+            user_id: User to check
+            
+        Returns:
+            True if on warning list
+        """
+        try:
+            is_member = await self.redis.smembers("bot:warning_list")
+            return str(user_id).encode() in is_member or str(user_id) in is_member
+        except Exception as e:
+            logger.error("is_on_warning_list_error", user_id=user_id, error=str(e))
+            return False
+    
+    async def remove_from_warning_list(self, user_id: int) -> bool:
+        """
+        Remove user from warning list.
+        
+        Args:
+            user_id: User to remove
+            
+        Returns:
+            True if successful
+        """
+        try:
+            await self.redis.srem("bot:warning_list", str(user_id))
+            logger.info("removed_from_warning_list", user_id=user_id)
+            return True
+        except Exception as e:
+            logger.error("remove_from_warning_list_error", user_id=user_id, error=str(e))
+            return False
+    
+    async def check_auto_ban_threshold(self, user_id: int) -> bool:
+        """
+        Check if user has reached auto-ban threshold based on reports.
+        
+        Args:
+            user_id: User to check
+            
+        Returns:
+            True if auto-ban threshold reached
+        """
+        try:
+            # Get report count
+            count_key = f"stats:{user_id}:report_count"
+            report_count_bytes = await self.redis.get(count_key)
+            report_count = int(report_count_bytes) if report_count_bytes else 0
+            
+            # Auto-ban threshold: 5 reports
+            AUTO_BAN_THRESHOLD = 5
+            
+            if report_count >= AUTO_BAN_THRESHOLD:
+                # Check if already banned
+                is_banned, _ = await self.is_user_banned(user_id)
+                if not is_banned:
+                    # Auto-ban for 7 days (604800 seconds)
+                    await self.ban_user(
+                        user_id=user_id,
+                        banned_by=0,  # System ban
+                        reason="abuse",  # Auto-ban from reports
+                        duration=604800,  # 7 days
+                        is_auto_ban=True,
+                    )
+                    logger.warning(
+                        "auto_ban_triggered",
+                        user_id=user_id,
+                        report_count=report_count,
+                    )
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error("check_auto_ban_threshold_error", user_id=user_id, error=str(e))
+            return False
+    
+    async def get_ban_info(self, user_id: int) -> Optional[Dict]:
+        """
+        Get detailed ban information for a user.
+        
+        Args:
+            user_id: User to check
+            
+        Returns:
+            Ban data dictionary or None if not banned
+        """
+        try:
+            import json
+            
+            ban_key = f"ban:{user_id}"
+            ban_data_bytes = await self.redis.get(ban_key)
+            
+            if not ban_data_bytes:
+                return None
+            
+            return json.loads(ban_data_bytes.decode('utf-8'))
+            
+        except Exception as e:
+            logger.error("get_ban_info_error", user_id=user_id, error=str(e))
+            return None
+    
+    async def get_banned_users_list(self) -> List[int]:
+        """
+        Get list of all banned users.
+        
+        Returns:
+            List of banned user IDs
+        """
+        try:
+            banned_set = await self.redis.smembers("bot:banned_users")
+            user_ids = []
+            for user_id_bytes in banned_set:
+                try:
+                    if isinstance(user_id_bytes, bytes):
+                        user_id_bytes = user_id_bytes.decode('utf-8')
+                    user_ids.append(int(user_id_bytes))
+                except (ValueError, AttributeError):
+                    continue
+            return user_ids
+        except Exception as e:
+            logger.error("get_banned_users_list_error", error=str(e))
+            return []
+    
+    async def get_warning_list(self) -> List[int]:
+        """
+        Get list of all users on warning list.
+        
+        Returns:
+            List of user IDs on warning list
+        """
+        try:
+            warning_set = await self.redis.smembers("bot:warning_list")
+            user_ids = []
+            for user_id_bytes in warning_set:
+                try:
+                    if isinstance(user_id_bytes, bytes):
+                        user_id_bytes = user_id_bytes.decode('utf-8')
+                    user_ids.append(int(user_id_bytes))
+                except (ValueError, AttributeError):
+                    continue
+            return user_ids
+        except Exception as e:
+            logger.error("get_warning_list_error", error=str(e))
+            return []

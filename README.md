@@ -13,6 +13,7 @@ A production-ready, fully anonymous Telegram bot that randomly connects users fo
 - 📊 **Scalable** - Handles 1000+ concurrent users
 - 🐳 **Docker Support** - Easy deployment with Docker Compose
 - 📱 **Admin Dashboard** - Web-based monitoring and user management
+- 🚫 **Ban/Unban System** - Complete moderation tools with auto-ban from reports
 
 ## 🚀 Quick Start
 
@@ -152,7 +153,37 @@ docker run -d --name chat-bot --env-file .env telegram-chat-bot
 | `/stop` | End current chat session |
 | `/next` | Skip to next partner (auto-rejoin queue) |
 | `/help` | Show help and usage instructions |
-| `/report` | Report abuse (placeholder for moderation) |
+| `/report` | Report abuse (triggers auto-ban after 5 reports) |
+
+## 🛡️ Moderation System
+
+### Ban/Unban Features
+
+The bot includes a comprehensive moderation system for admins:
+
+**Admin Commands:**
+- `/admin` - Show admin panel with all commands
+- `/ban` - Ban a user (temporary or permanent)
+- `/unban` - Unban a user
+- `/warn` - Add warning to a user
+- `/checkban <user_id>` - Check ban status
+- `/bannedlist` - View all banned users
+- `/warninglist` - View users with warnings
+
+**Features:**
+- ✅ Temporary bans (1h, 24h, 7d, 30d)
+- ✅ Permanent bans
+- ✅ Auto-ban after 5 reports
+- ✅ Warning system
+- ✅ 5 ban reasons: nudity, spam, abuse, fake reports, harassment
+- ✅ User notifications
+- ✅ Ban history tracking
+
+**Documentation:**
+- 📖 **Quick Guide:** `ADMIN_BAN_GUIDE.md` - Admin quick reference
+- 📖 **Complete Guide:** `BAN_SYSTEM.md` - Full system documentation
+- 📖 **Architecture:** `BAN_SYSTEM_ARCHITECTURE.md` - Technical details
+- 📖 **Testing:** `TESTING_CHECKLIST.md` - Test procedures
 
 ## 🏗️ Architecture
 

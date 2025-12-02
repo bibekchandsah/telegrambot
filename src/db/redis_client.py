@@ -114,6 +114,14 @@ class RedisClient:
             logger.error("redis_lrange_error", key=key, error=str(e))
             raise
     
+    async def ltrim(self, key: str, start: int, end: int) -> bool:
+        """Trim list to specified range."""
+        try:
+            return await self.client.ltrim(key, start, end)
+        except RedisError as e:
+            logger.error("redis_ltrim_error", key=key, error=str(e))
+            raise
+    
     async def keys(self, pattern: str) -> list:
         """Get keys matching pattern."""
         try:
@@ -182,6 +190,14 @@ class RedisClient:
             return await self.client.smembers(key)
         except RedisError as e:
             logger.error("redis_smembers_error", key=key, error=str(e))
+            raise
+    
+    async def srem(self, key: str, *members: str) -> int:
+        """Remove members from a set."""
+        try:
+            return await self.client.srem(key, *members)
+        except RedisError as e:
+            logger.error("redis_srem_error", key=key, error=str(e))
             raise
 
 

@@ -25,6 +25,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
     admin_manager: AdminManager = context.bot_data.get("admin_manager")
     
+    # Check if user is banned
+    if admin_manager:
+        is_banned, ban_data = await admin_manager.is_user_banned(sender_id)
+        if is_banned and ban_data:
+            reason = ban_data.get("reason", "Unknown")
+            expires_at = ban_data.get("expires_at")
+            
+            ban_reasons_map = {
+                "nudity": "Nudity / Explicit Content",
+                "spam": "Spam",
+                "abuse": "Abuse",
+                "fake_reports": "Fake Reports",
+                "harassment": "Harassment",
+            }
+            
+            if expires_at:
+                from datetime import datetime
+                expiry_time = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                ban_msg = (
+                    f"🚫 **You are temporarily banned**\n\n"
+                    f"Reason: {ban_reasons_map.get(reason, reason)}\n"
+                    f"Ban expires: {expiry_time}\n\n"
+                    f"If you believe this is a mistake, please contact support."
+                )
+            else:
+                ban_msg = (
+                    f"🚫 **You are permanently banned**\n\n"
+                    f"Reason: {ban_reasons_map.get(reason, reason)}\n\n"
+                    f"If you believe this is a mistake, please contact support."
+                )
+            
+            await update.message.reply_text(ban_msg, parse_mode="Markdown")
+            return
+    
     # Store user info for dashboard
     if admin_manager:
         try:

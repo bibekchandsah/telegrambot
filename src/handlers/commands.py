@@ -43,6 +43,11 @@ MEDIA_SETTINGS = 5
 # Conversation states for admin broadcast
 BROADCAST_MESSAGE = 6
 
+# Conversation states for ban system
+BAN_USER_ID, BAN_REASON, BAN_DURATION = range(7, 10)
+UNBAN_USER_ID = 10
+WARNING_USER_ID, WARNING_REASON = range(11, 13)
+
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
@@ -148,6 +153,41 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     matching: MatchingEngine = context.bot_data["matching"]
     preference_manager: PreferenceManager = context.bot_data.get("preference_manager")
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    # Check if user is banned
+    if admin_manager:
+        is_banned, ban_data = await admin_manager.is_user_banned(user_id)
+        if is_banned and ban_data:
+            reason = ban_data.get("reason", "Unknown")
+            expires_at = ban_data.get("expires_at")
+            
+            ban_reasons_map = {
+                "nudity": "Nudity / Explicit Content",
+                "spam": "Spam",
+                "abuse": "Abuse",
+                "fake_reports": "Fake Reports",
+                "harassment": "Harassment",
+            }
+            
+            if expires_at:
+                from datetime import datetime
+                expiry_time = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                ban_msg = (
+                    f"🚫 **You are temporarily banned**\n\n"
+                    f"Reason: {ban_reasons_map.get(reason, reason)}\n"
+                    f"Ban expires: {expiry_time}\n\n"
+                    f"You cannot use the bot until the ban expires."
+                )
+            else:
+                ban_msg = (
+                    f"🚫 **You are permanently banned**\n\n"
+                    f"Reason: {ban_reasons_map.get(reason, reason)}\n\n"
+                    f"You cannot use the bot."
+                )
+            
+            await update.message.reply_text(ban_msg, parse_mode="Markdown")
+            return
     
     try:
         # Check current state
@@ -1500,9 +1540,17 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     admin_msg = (
         "🔐 **Admin Panel**\n\n"
-        "Available commands:\n\n"
+        "**Broadcast Commands:**\n"
         "/broadcast - Send message to all users\n"
-        "/broadcastactive - Send to active users only\n"
+        "/broadcastactive - Send to active users only\n\n"
+        "**Ban/Moderation Commands:**\n"
+        "/ban - Ban a user (temporary/permanent)\n"
+        "/unban - Unban a user\n"
+        "/warn - Add warning to user\n"
+        "/checkban - Check if user is banned\n"
+        "/bannedlist - View all banned users\n"
+        "/warninglist - View users on warning list\n\n"
+        "**Statistics:**\n"
         "/stats - View bot statistics\n\n"
         "Use these commands responsibly."
     )
@@ -1732,6 +1780,540 @@ async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancel broadcast operation."""
     context.user_data.clear()
     await update.message.reply_text("❌ Broadcast cancelled.")
+    return ConversationHandler.END
+
+
+# ============================================
+# BAN / UNBAN COMMANDS
+# ============================================
+
+BAN_REASONS = {
+    "nudity": "Nudity / Explicit Content",
+    "spam": "Spam",
+    "abuse": "Abuse",
+    "fake_reports": "Fake Reports",
+    "harassment": "Harassment",
+}
+
+
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /ban command - start ban process."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    await update.message.reply_text(
+        "🚫 **Ban User**\n\n"
+        "Send the user ID to ban.\n"
+        "Use /cancel to abort.",
+        parse_mode="Markdown",
+    )
+    
+    return BAN_USER_ID
+
+
+async def ban_user_id_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle user ID input for ban."""
+    try:
+        user_id_to_ban = int(update.message.text.strip())
+        context.user_data["ban_user_id"] = user_id_to_ban
+        
+        # Show ban reason selection
+        keyboard = [
+            [InlineKeyboardButton(f"📵 {BAN_REASONS['nudity']}", callback_data="ban_reason_nudity")],
+            [InlineKeyboardButton(f"⚠️ {BAN_REASONS['spam']}", callback_data="ban_reason_spam")],
+            [InlineKeyboardButton(f"🚨 {BAN_REASONS['abuse']}", callback_data="ban_reason_abuse")],
+            [InlineKeyboardButton(f"❌ {BAN_REASONS['fake_reports']}", callback_data="ban_reason_fake_reports")],
+            [InlineKeyboardButton(f"😡 {BAN_REASONS['harassment']}", callback_data="ban_reason_harassment")],
+            [InlineKeyboardButton("❌ Cancel", callback_data="ban_cancel")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            f"User ID: `{user_id_to_ban}`\n\n"
+            f"Select ban reason:",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        
+        return BAN_REASON
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Invalid user ID. Please send a valid number.\n"
+            "Use /cancel to abort."
+        )
+        return BAN_USER_ID
+
+
+async def ban_reason_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle ban reason selection."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "ban_cancel":
+        await query.edit_message_text("❌ Ban operation cancelled.")
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    reason = query.data.replace("ban_reason_", "")
+    context.user_data["ban_reason"] = reason
+    
+    user_id_to_ban = context.user_data.get("ban_user_id")
+    
+    # Show duration selection
+    keyboard = [
+        [InlineKeyboardButton("⏰ 1 Hour", callback_data="ban_duration_3600")],
+        [InlineKeyboardButton("⏰ 24 Hours", callback_data="ban_duration_86400")],
+        [InlineKeyboardButton("⏰ 7 Days", callback_data="ban_duration_604800")],
+        [InlineKeyboardButton("⏰ 30 Days", callback_data="ban_duration_2592000")],
+        [InlineKeyboardButton("🔒 Permanent", callback_data="ban_duration_permanent")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="ban_cancel")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        f"User ID: `{user_id_to_ban}`\n"
+        f"Reason: **{BAN_REASONS.get(reason, reason)}**\n\n"
+        f"Select ban duration:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    
+    return BAN_DURATION
+
+
+async def ban_duration_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle ban duration selection and execute ban."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if query.data == "ban_cancel":
+        await query.edit_message_text("❌ Ban operation cancelled.")
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    user_id_to_ban = context.user_data.get("ban_user_id")
+    reason = context.user_data.get("ban_reason")
+    
+    # Parse duration
+    if query.data == "ban_duration_permanent":
+        duration = None
+        duration_text = "Permanent"
+    else:
+        duration = int(query.data.replace("ban_duration_", ""))
+        # Convert to human-readable
+        if duration == 3600:
+            duration_text = "1 Hour"
+        elif duration == 86400:
+            duration_text = "24 Hours"
+        elif duration == 604800:
+            duration_text = "7 Days"
+        elif duration == 2592000:
+            duration_text = "30 Days"
+        else:
+            duration_text = f"{duration} seconds"
+    
+    # Execute ban
+    try:
+        success = await admin_manager.ban_user(
+            user_id=user_id_to_ban,
+            banned_by=user_id,
+            reason=reason,
+            duration=duration,
+            is_auto_ban=False,
+        )
+        
+        if success:
+            await query.edit_message_text(
+                f"✅ **User Banned Successfully**\n\n"
+                f"User ID: `{user_id_to_ban}`\n"
+                f"Reason: **{BAN_REASONS.get(reason, reason)}**\n"
+                f"Duration: **{duration_text}**\n"
+                f"Banned by: Admin {user_id}",
+                parse_mode="Markdown",
+            )
+            
+            # Notify the banned user
+            try:
+                ban_message = (
+                    f"🚫 **You have been banned**\n\n"
+                    f"Reason: {BAN_REASONS.get(reason, reason)}\n"
+                    f"Duration: {duration_text}\n\n"
+                    f"If you believe this is a mistake, please contact support."
+                )
+                await context.bot.send_message(user_id_to_ban, ban_message, parse_mode="Markdown")
+            except Exception as e:
+                logger.warning("failed_to_notify_banned_user", user_id=user_id_to_ban, error=str(e))
+        else:
+            await query.edit_message_text(
+                f"❌ Failed to ban user {user_id_to_ban}. Please try again."
+            )
+        
+        context.user_data.clear()
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error("ban_execution_error", user_id=user_id_to_ban, error=str(e))
+        await query.edit_message_text(
+            f"❌ An error occurred while banning the user. Please try again."
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+
+async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /unban command - start unban process."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    await update.message.reply_text(
+        "✅ **Unban User**\n\n"
+        "Send the user ID to unban.\n"
+        "Use /cancel to abort.",
+        parse_mode="Markdown",
+    )
+    
+    return UNBAN_USER_ID
+
+
+async def unban_user_id_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle user ID input for unban."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    try:
+        user_id_to_unban = int(update.message.text.strip())
+        
+        # Check if user is actually banned
+        is_banned, ban_data = await admin_manager.is_user_banned(user_id_to_unban)
+        
+        if not is_banned:
+            await update.message.reply_text(
+                f"ℹ️ User `{user_id_to_unban}` is not currently banned.",
+                parse_mode="Markdown",
+            )
+            return ConversationHandler.END
+        
+        # Execute unban
+        success = await admin_manager.unban_user(user_id_to_unban, user_id)
+        
+        if success:
+            await update.message.reply_text(
+                f"✅ **User Unbanned Successfully**\n\n"
+                f"User ID: `{user_id_to_unban}`\n"
+                f"Unbanned by: Admin {user_id}",
+                parse_mode="Markdown",
+            )
+            
+            # Notify the unbanned user
+            try:
+                unban_message = (
+                    f"✅ **Your ban has been lifted**\n\n"
+                    f"You can now use the bot again.\n"
+                    f"Please follow the rules to avoid future bans."
+                )
+                await context.bot.send_message(user_id_to_unban, unban_message, parse_mode="Markdown")
+            except Exception as e:
+                logger.warning("failed_to_notify_unbanned_user", user_id=user_id_to_unban, error=str(e))
+        else:
+            await update.message.reply_text(
+                f"❌ Failed to unban user {user_id_to_unban}. Please try again."
+            )
+        
+        return ConversationHandler.END
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Invalid user ID. Please send a valid number.\n"
+            "Use /cancel to abort."
+        )
+        return UNBAN_USER_ID
+    except Exception as e:
+        logger.error("unban_execution_error", error=str(e))
+        await update.message.reply_text(
+            f"❌ An error occurred. Please try again."
+        )
+        return ConversationHandler.END
+
+
+async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /warn command - add warning to user."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    await update.message.reply_text(
+        "⚠️ **Add Warning**\n\n"
+        "Send the user ID to warn.\n"
+        "Use /cancel to abort.",
+        parse_mode="Markdown",
+    )
+    
+    return WARNING_USER_ID
+
+
+async def warn_user_id_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle user ID input for warning."""
+    try:
+        user_id_to_warn = int(update.message.text.strip())
+        context.user_data["warn_user_id"] = user_id_to_warn
+        
+        await update.message.reply_text(
+            f"User ID: `{user_id_to_warn}`\n\n"
+            f"Send the warning reason:",
+            parse_mode="Markdown",
+        )
+        
+        return WARNING_REASON
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Invalid user ID. Please send a valid number.\n"
+            "Use /cancel to abort."
+        )
+        return WARNING_USER_ID
+
+
+async def warn_reason_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle warning reason input."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    user_id_to_warn = context.user_data.get("warn_user_id")
+    reason = update.message.text.strip()
+    
+    try:
+        # Add warning
+        warning_count = await admin_manager.add_warning(user_id_to_warn, user_id, reason)
+        
+        await update.message.reply_text(
+            f"⚠️ **Warning Added Successfully**\n\n"
+            f"User ID: `{user_id_to_warn}`\n"
+            f"Reason: {reason}\n"
+            f"Total Warnings: {warning_count}\n"
+            f"Warned by: Admin {user_id}",
+            parse_mode="Markdown",
+        )
+        
+        # Notify the warned user
+        try:
+            warn_message = (
+                f"⚠️ **You have received a warning**\n\n"
+                f"Reason: {reason}\n"
+                f"Total Warnings: {warning_count}\n\n"
+                f"⚠️ Multiple warnings may result in a ban.\n"
+                f"Please follow the rules to avoid further action."
+            )
+            await context.bot.send_message(user_id_to_warn, warn_message, parse_mode="Markdown")
+        except Exception as e:
+            logger.warning("failed_to_notify_warned_user", user_id=user_id_to_warn, error=str(e))
+        
+        context.user_data.clear()
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error("warn_execution_error", error=str(e))
+        await update.message.reply_text(
+            f"❌ An error occurred. Please try again."
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+
+async def checkban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /checkban command - check if user is banned."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    # Check if user ID was provided
+    if not context.args or len(context.args) != 1:
+        await update.message.reply_text(
+            "❌ Usage: /checkban <user_id>\n"
+            "Example: /checkban 123456789"
+        )
+        return
+    
+    try:
+        user_id_to_check = int(context.args[0])
+        
+        is_banned, ban_data = await admin_manager.is_user_banned(user_id_to_check)
+        
+        if is_banned and ban_data:
+            import time
+            banned_at = ban_data.get("banned_at", 0)
+            expires_at = ban_data.get("expires_at")
+            reason = ban_data.get("reason", "Unknown")
+            banned_by = ban_data.get("banned_by", 0)
+            is_auto_ban = ban_data.get("is_auto_ban", False)
+            
+            # Format ban time
+            from datetime import datetime
+            ban_time = datetime.fromtimestamp(banned_at).strftime("%Y-%m-%d %H:%M:%S")
+            
+            if expires_at:
+                expiry_time = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                remaining = expires_at - int(time.time())
+                if remaining > 86400:
+                    remaining_text = f"{remaining // 86400} days"
+                elif remaining > 3600:
+                    remaining_text = f"{remaining // 3600} hours"
+                else:
+                    remaining_text = f"{remaining // 60} minutes"
+                duration_text = f"Expires: {expiry_time}\nRemaining: {remaining_text}"
+            else:
+                duration_text = "Duration: Permanent"
+            
+            auto_ban_text = " (Auto-ban)" if is_auto_ban else ""
+            
+            message = (
+                f"🚫 **User is BANNED{auto_ban_text}**\n\n"
+                f"User ID: `{user_id_to_check}`\n"
+                f"Reason: {BAN_REASONS.get(reason, reason)}\n"
+                f"Banned at: {ban_time}\n"
+                f"{duration_text}\n"
+                f"Banned by: Admin {banned_by if banned_by > 0 else 'System'}"
+            )
+        else:
+            # Check warnings
+            warning_count = await admin_manager.get_warning_count(user_id_to_check)
+            is_on_warning = await admin_manager.is_on_warning_list(user_id_to_check)
+            
+            message = f"✅ **User is NOT banned**\n\nUser ID: `{user_id_to_check}`"
+            
+            if is_on_warning or warning_count > 0:
+                message += f"\n\n⚠️ Warnings: {warning_count}"
+                if is_on_warning:
+                    message += "\n🔶 On warning list"
+        
+        await update.message.reply_text(message, parse_mode="Markdown")
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Invalid user ID. Please provide a valid number."
+        )
+    except Exception as e:
+        logger.error("checkban_command_error", error=str(e))
+        await update.message.reply_text(
+            "❌ An error occurred while checking ban status."
+        )
+
+
+async def bannedlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /bannedlist command - show all banned users."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    try:
+        banned_users = await admin_manager.get_banned_users_list()
+        
+        if not banned_users:
+            await update.message.reply_text(
+                "✅ No users are currently banned."
+            )
+            return
+        
+        message = f"🚫 **Banned Users** ({len(banned_users)} total)\n\n"
+        
+        # Show first 20 banned users with details
+        for i, banned_user_id in enumerate(banned_users[:20]):
+            ban_data = await admin_manager.get_ban_info(banned_user_id)
+            if ban_data:
+                reason = ban_data.get("reason", "Unknown")
+                is_permanent = ban_data.get("is_permanent", False)
+                is_auto_ban = ban_data.get("is_auto_ban", False)
+                
+                duration = "Permanent" if is_permanent else "Temporary"
+                auto_text = " (Auto)" if is_auto_ban else ""
+                
+                message += f"{i+1}. `{banned_user_id}` - {BAN_REASONS.get(reason, reason)} ({duration}{auto_text})\n"
+        
+        if len(banned_users) > 20:
+            message += f"\n... and {len(banned_users) - 20} more"
+        
+        await update.message.reply_text(message, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error("bannedlist_command_error", error=str(e))
+        await update.message.reply_text(
+            "❌ An error occurred while fetching banned users list."
+        )
+
+
+async def warninglist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /warninglist command - show users on warning list."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    try:
+        warning_users = await admin_manager.get_warning_list()
+        
+        if not warning_users:
+            await update.message.reply_text(
+                "✅ No users are currently on the warning list."
+            )
+            return
+        
+        message = f"⚠️ **Warning List** ({len(warning_users)} total)\n\n"
+        
+        # Show first 20 users with warning counts
+        for i, warned_user_id in enumerate(warning_users[:20]):
+            warning_count = await admin_manager.get_warning_count(warned_user_id)
+            message += f"{i+1}. `{warned_user_id}` - {warning_count} warning(s)\n"
+        
+        if len(warning_users) > 20:
+            message += f"\n... and {len(warning_users) - 20} more"
+        
+        await update.message.reply_text(message, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error("warninglist_command_error", error=str(e))
+        await update.message.reply_text(
+            "❌ An error occurred while fetching warning list."
+        )
+
+
+async def cancel_ban_operation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel ban/unban/warn operation."""
+    context.user_data.clear()
+    await update.message.reply_text("❌ Operation cancelled.")
     return ConversationHandler.END
 
 

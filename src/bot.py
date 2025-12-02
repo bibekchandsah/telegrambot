@@ -47,6 +47,19 @@ from src.handlers.commands import (
     broadcast_callback,
     stats_command,
     cancel_broadcast,
+    ban_command,
+    ban_user_id_step,
+    ban_reason_callback,
+    ban_duration_callback,
+    unban_command,
+    unban_user_id_step,
+    warn_command,
+    warn_user_id_step,
+    warn_reason_step,
+    checkban_command,
+    bannedlist_command,
+    warninglist_command,
+    cancel_ban_operation,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -54,6 +67,12 @@ from src.handlers.commands import (
     PREF_COUNTRY,
     MEDIA_SETTINGS,
     BROADCAST_MESSAGE,
+    BAN_USER_ID,
+    BAN_REASON,
+    BAN_DURATION,
+    UNBAN_USER_ID,
+    WARNING_USER_ID,
+    WARNING_REASON,
 )
 from src.handlers.messages import (
     handle_message,
@@ -185,6 +204,9 @@ def main():
         # Register admin commands
         application.add_handler(CommandHandler("admin", admin_command))
         application.add_handler(CommandHandler("stats", stats_command))
+        application.add_handler(CommandHandler("checkban", checkban_command))
+        application.add_handler(CommandHandler("bannedlist", bannedlist_command))
+        application.add_handler(CommandHandler("warninglist", warninglist_command))
         
         # Register feedback callback handler
         application.add_handler(
@@ -227,6 +249,51 @@ def main():
             fallbacks=[CommandHandler("cancel", cancel_broadcast)],
         )
         application.add_handler(broadcast_conv_handler)
+        
+        # Register ban conversation handler
+        ban_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("ban", ban_command)],
+            states={
+                BAN_USER_ID: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, ban_user_id_step),
+                ],
+                BAN_REASON: [
+                    CallbackQueryHandler(ban_reason_callback, pattern="^ban_(reason_|cancel)"),
+                ],
+                BAN_DURATION: [
+                    CallbackQueryHandler(ban_duration_callback, pattern="^ban_(duration_|cancel)"),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_ban_operation)],
+        )
+        application.add_handler(ban_conv_handler)
+        
+        # Register unban conversation handler
+        unban_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("unban", unban_command)],
+            states={
+                UNBAN_USER_ID: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, unban_user_id_step),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_ban_operation)],
+        )
+        application.add_handler(unban_conv_handler)
+        
+        # Register warning conversation handler
+        warn_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("warn", warn_command)],
+            states={
+                WARNING_USER_ID: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, warn_user_id_step),
+                ],
+                WARNING_REASON: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, warn_reason_step),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_ban_operation)],
+        )
+        application.add_handler(warn_conv_handler)
         
         # Register profile editing conversation handler
         profile_conv_handler = ConversationHandler(
