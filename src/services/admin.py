@@ -1,5 +1,5 @@
 """Admin management for broadcast messages."""
-from typing import List, Optional
+from typing import List, Optional, Dict
 from src.db.redis_client import RedisClient
 from src.utils.logger import get_logger
 
@@ -48,22 +48,42 @@ class AdminManager:
             is_premium: Whether user has Telegram Premium (optional)
         """
         try:
+            import json
+            import time
+            
             # Add user to a set of all users
             await self.redis.sadd("bot:all_users", str(user_id))
             
+            # Check if user already exists to preserve account_created_at
+            user_info_key = f"user_info:{user_id}"
+            existing_data = await self.redis.get(user_info_key)
+            account_created_at = None
+            
+            if existing_data:
+                try:
+                    existing_info = json.loads(existing_data.decode('utf-8'))
+                    account_created_at = existing_info.get('account_created_at')
+                except:
+                    pass
+            
+            # If no existing timestamp, set it now (first registration)
+            if not account_created_at:
+                account_created_at = int(time.time())
+            
             # Store user info (username and name)
             if username or first_name:
-                import json
                 user_info = {
                     'username': username,
                     'first_name': first_name,
                     'last_name': last_name,
                     'language_code': language_code,
                     'is_bot': is_bot,
-                    'is_premium': is_premium
+                    'is_premium': is_premium,
+                    'account_created_at': account_created_at,
+                    'last_activity_at': int(time.time())
                 }
                 await self.redis.set(
-                    f"user_info:{user_id}",
+                    user_info_key,
                     json.dumps(user_info),
                     ex=None  # No expiry
                 )
@@ -71,6 +91,54 @@ class AdminManager:
             logger.debug("user_registered", user_id=user_id, username=username)
         except Exception as e:
             logger.error("register_user_error", user_id=user_id, error=str(e))
+    
+    async def increment_message_count(self, user_id: int) -> None:
+        """
+        Increment user's message count.
+        
+        Args:
+            user_id: Telegram user ID
+        """
+        try:
+            key = f"stats:{user_id}:messages"
+            await self.redis.incr(key)
+        except Exception as e:
+            logger.error("increment_message_count_error", user_id=user_id, error=str(e))
+    
+    async def increment_chat_count(self, user_id: int) -> None:
+        """
+        Increment user's completed chat count.
+        
+        Args:
+            user_id: Telegram user ID
+        """
+        try:
+            key = f"stats:{user_id}:chats"
+            await self.redis.incr(key)
+        except Exception as e:
+            logger.error("increment_chat_count_error", user_id=user_id, error=str(e))
+    
+    async def get_user_stats(self, user_id: int) -> Dict[str, int]:
+        """
+        Get user statistics.
+        
+        Args:
+            user_id: Telegram user ID
+            
+        Returns:
+            Dict with message_count and chat_count
+        """
+        try:
+            message_count = await self.redis.get(f"stats:{user_id}:messages")
+            chat_count = await self.redis.get(f"stats:{user_id}:chats")
+            
+            return {
+                'message_count': int(message_count) if message_count else 0,
+                'chat_count': int(chat_count) if chat_count else 0
+            }
+        except Exception as e:
+            logger.error("get_user_stats_error", user_id=user_id, error=str(e))
+            return {'message_count': 0, 'chat_count': 0}
     
     async def get_all_users(self) -> List[int]:
         """

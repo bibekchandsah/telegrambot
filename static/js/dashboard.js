@@ -299,6 +299,7 @@ async function viewUser(userId) {
         let html = '<div class="user-detail-grid">';
         
         // Basic info
+        html += '<div style="grid-column: 1 / -1; margin-bottom: 15px;"><h3 style="margin: 0;">👤 Basic Information</h3></div>';
         html += createDetailItem('User ID', user.user_id);
         html += createDetailItem('Username', user.username || 'N/A');
         html += createDetailItem('First Name', user.first_name || 'N/A');
@@ -309,7 +310,49 @@ async function viewUser(userId) {
         html += createDetailItem('Gender', user.gender || 'N/A');
         html += createDetailItem('Country', user.country || 'N/A');
         
+        // Activity & Statistics
+        html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">📊 Activity & Statistics</h3></div>';
+        
+        // Format timestamps
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString();
+        };
+        
+        html += createDetailItem('Account Created', formatDate(user.account_created_at));
+        html += createDetailItem('Last Activity', formatDate(user.last_activity_at));
+        html += createDetailItem('Total Messages Sent', user.message_count !== undefined ? user.message_count : 'N/A');
+        html += createDetailItem('Total Chats Completed', user.chat_count !== undefined ? user.chat_count : 'N/A');
+        
+        // Format rating with emoji
+        let ratingDisplay = 'N/A';
+        if (user.rating_score !== undefined) {
+            const score = user.rating_score;
+            let emoji = '😐';
+            let status = 'Neutral';
+            
+            if (score >= 80) {
+                emoji = '🌟';
+                status = 'Excellent';
+            } else if (score >= 60) {
+                emoji = '😊';
+                status = 'Good';
+            } else if (score >= 40) {
+                emoji = '😐';
+                status = 'Neutral';
+            } else {
+                emoji = '😔';
+                status = 'Needs Improvement';
+            }
+            
+            ratingDisplay = `${emoji} ${status} - ${score.toFixed(1)}% (👍 ${user.positive_ratings} | 👎 ${user.negative_ratings} | Total Chats: ${user.total_chats})`;
+        }
+        
+        html += createDetailItem('Rating', ratingDisplay);
+        
         // Status
+        html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">📍 Current Status</h3></div>';
         html += createDetailItem('Current State', user.state || 'unknown');
         html += createDetailItem('In Queue', user.in_queue ? 'Yes' : 'No');
         html += createDetailItem('In Chat', user.in_chat ? 'Yes' : 'No');
@@ -320,6 +363,7 @@ async function viewUser(userId) {
         
         // Preferences
         if (user.preferences && Object.keys(user.preferences).length > 0) {
+            html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">⚙️ Preferences</h3></div>';
             html += createDetailItem('Preferences', JSON.stringify(user.preferences, null, 2), true);
         }
         

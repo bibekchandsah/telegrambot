@@ -38,6 +38,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 is_bot=user.is_bot,
                 is_premium=user.is_premium
             )
+            # Increment message count
+            await admin_manager.increment_message_count(user.id)
         except Exception as e:
             logger.debug("user_info_storage_failed", user_id=sender_id, error=str(e))
     

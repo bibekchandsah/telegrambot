@@ -404,6 +404,48 @@ class DashboardService:
             else:
                 user_info['state'] = 'unknown'
             
+            # Get user statistics
+            message_count = await self.redis.get(f"stats:{user_id}:messages")
+            user_info['message_count'] = int(message_count) if message_count else 0
+            
+            # Get user rating (includes total_chats which has historical data)
+            rating_key = f"rating:{user_id}"
+            rating_bytes = await self.redis.get(rating_key)
+            if rating_bytes:
+                try:
+                    rating_data = json.loads(rating_bytes.decode('utf-8'))
+                    positive = rating_data.get('positive_ratings', 0)
+                    negative = rating_data.get('negative_ratings', 0)
+                    total_chats = rating_data.get('total_chats', 0)
+                    total_rated = positive + negative
+                    
+                    # Calculate rating score (same formula as UserRating class)
+                    if total_rated > 0:
+                        rating_score = (positive / total_rated) * 100
+                    else:
+                        rating_score = 50.0  # Neutral for new users
+                    
+                    user_info['rating_score'] = round(rating_score, 2)
+                    user_info['positive_ratings'] = positive
+                    user_info['negative_ratings'] = negative
+                    user_info['total_rated'] = total_rated
+                    user_info['total_chats'] = total_chats  # Use this as the authoritative chat count
+                    user_info['chat_count'] = total_chats  # Also set chat_count to match
+                except (json.JSONDecodeError, AttributeError, ZeroDivisionError):
+                    user_info['rating_score'] = 50.0
+                    user_info['positive_ratings'] = 0
+                    user_info['negative_ratings'] = 0
+                    user_info['total_rated'] = 0
+                    user_info['total_chats'] = 0
+                    user_info['chat_count'] = 0
+            else:
+                user_info['rating_score'] = 50.0
+                user_info['positive_ratings'] = 0
+                user_info['negative_ratings'] = 0
+                user_info['total_rated'] = 0
+                user_info['total_chats'] = 0
+                user_info['chat_count'] = 0
+            
             return user_info
         except Exception as e:
             logger.error("get_user_details_error", user_id=user_id, error=str(e))
@@ -473,6 +515,8 @@ class DashboardService:
             language_code = None
             is_bot = None
             is_premium = None
+            account_created_at = None
+            last_activity_at = None
             user_info_key = f"user_info:{user_id}"
             user_info_bytes = await self.redis.get(user_info_key)
             
@@ -485,6 +529,8 @@ class DashboardService:
                     language_code = user_info_data.get('language_code')
                     is_bot = user_info_data.get('is_bot')
                     is_premium = user_info_data.get('is_premium')
+                    account_created_at = user_info_data.get('account_created_at')
+                    last_activity_at = user_info_data.get('last_activity_at')
                 except (json.JSONDecodeError, AttributeError):
                     pass
             
@@ -527,6 +573,8 @@ class DashboardService:
                 'language_code': language_code,
                 'is_bot': is_bot,
                 'is_premium': is_premium,
+                'account_created_at': account_created_at,
+                'last_activity_at': last_activity_at,
                 'gender': profile_data.get('gender', 'N/A'),
                 'country': profile_data.get('country', 'N/A')
             }
@@ -540,6 +588,8 @@ class DashboardService:
                 'language_code': None,
                 'is_bot': None,
                 'is_premium': None,
+                'account_created_at': None,
+                'last_activity_at': None,
                 'gender': 'N/A',
                 'country': 'N/A'
             }

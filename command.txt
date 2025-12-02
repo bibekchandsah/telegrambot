@@ -9,3 +9,8 @@
 /preferences
 /cancel
 /mediasettings
+
+/admin
+/broadcast
+/broadcastactive
+/stats

@@ -67,7 +67,7 @@ Profile contains:
 
 11. Admin Dashboard (Web-Based)
 --------------------------------------------------
-1. User Management
+1. User Management (implemented)
 - Admin should be able to:
     - View all registered users
     - View online / active users
@@ -81,7 +81,7 @@ Profile contains:
     - View detailed user profile
     - View chat history (if stored)
 
-2. Ban / Unban System
+2. Ban / Unban System ()
 - Admin should be able to:
     - Ban user (temporary/permanent)
     - Unban user
@@ -157,6 +157,16 @@ Profile contains:
     - Force logout of all users
     - Reset whole queue
 
+8. Special Admin Commands (Via Telegram)
+- /admin
+    - /ban userID
+    - /unban userID
+    - /warn userID
+    - /matchstatus
+    - /queue
+    - /resetqueue
+    - /mode maintenance
+
 
 
 Analytics:
@@ -189,3 +199,28 @@ docker run -d -p 6379:6379 --name redis-dev redis:7-alpine
 
 # 3. Run the bot
 python -m src.bot
+
+
+
+
+
+
+Average Chat Duration - How long chats typically last
+Total Time in Chat - Cumulative chat time
+Queue Wait Times - Average/total time spent in queue
+Skip Rate - How often user uses /next
+Report History - If user was reported by others
+Media Preferences - Current settings (partially implemented)
+Matching Preferences - Filter settings (partially implemented)
+User Rating - Average rating received from partners
+Ratings Given - How user rates others
+Blocked Users List - Users they've blocked
+Block Count - How many times they've been blocked by others
+Favorite Partners - If they chatted with someone multiple times
+Session Count - Number of different chat sessions
+Peak Activity Hours - When they're most active
+
+
+
+
+admin.py / messages.py / commands.py / dashboard.py / dashboard.js / 
