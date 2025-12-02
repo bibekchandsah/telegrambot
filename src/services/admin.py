@@ -140,6 +140,134 @@ class AdminManager:
             logger.error("get_user_stats_error", user_id=user_id, error=str(e))
             return {'message_count': 0, 'chat_count': 0}
     
+    async def track_chat_start(self, user_id: int) -> None:
+        """
+        Track when a user starts a chat.
+        
+        Args:
+            user_id: Telegram user ID
+        """
+        try:
+            import time
+            key = f"stats:{user_id}:chat_start"
+            await self.redis.set(key, int(time.time()), ex=86400)  # 24 hour expiry
+        except Exception as e:
+            logger.error("track_chat_start_error", user_id=user_id, error=str(e))
+    
+    async def track_chat_end(self, user_id: int) -> None:
+        """
+        Track when a user ends a chat and calculate duration.
+        
+        Args:
+            user_id: Telegram user ID
+        """
+        try:
+            import time
+            start_key = f"stats:{user_id}:chat_start"
+            start_time = await self.redis.get(start_key)
+            
+            if start_time:
+                duration = int(time.time()) - int(start_time)
+                
+                # Update total chat time
+                total_key = f"stats:{user_id}:total_chat_time"
+                await self.redis.incr(total_key, duration)
+                
+                # Add to chat durations list (for average calculation)
+                durations_key = f"stats:{user_id}:chat_durations"
+                await self.redis.lpush(durations_key, duration)
+                await self.redis.ltrim(durations_key, 0, 99)  # Keep last 100 chats
+                
+                # Clean up start time
+                await self.redis.delete(start_key)
+        except Exception as e:
+            logger.error("track_chat_end_error", user_id=user_id, error=str(e))
+    
+    async def track_queue_join(self, user_id: int) -> None:
+        """
+        Track when a user joins the queue.
+        
+        Args:
+            user_id: Telegram user ID
+        """
+        try:
+            import time
+            key = f"stats:{user_id}:queue_join"
+            await self.redis.set(key, int(time.time()), ex=3600)  # 1 hour expiry
+        except Exception as e:
+            logger.error("track_queue_join_error", user_id=user_id, error=str(e))
+    
+    async def track_queue_leave(self, user_id: int) -> None:
+        """
+        Track when a user leaves the queue and calculate wait time.
+        
+        Args:
+            user_id: Telegram user ID
+        """
+        try:
+            import time
+            join_key = f"stats:{user_id}:queue_join"
+            join_time = await self.redis.get(join_key)
+            
+            if join_time:
+                wait_time = int(time.time()) - int(join_time)
+                
+                # Update total queue time
+                total_key = f"stats:{user_id}:total_queue_time"
+                await self.redis.incr(total_key, wait_time)
+                
+                # Increment queue sessions count
+                sessions_key = f"stats:{user_id}:queue_sessions"
+                await self.redis.incr(sessions_key)
+                
+                # Clean up join time
+                await self.redis.delete(join_key)
+        except Exception as e:
+            logger.error("track_queue_leave_error", user_id=user_id, error=str(e))
+    
+    async def increment_skip_count(self, user_id: int) -> None:
+        """
+        Increment user's skip count (when they use /next).
+        
+        Args:
+            user_id: Telegram user ID
+        """
+        try:
+            key = f"stats:{user_id}:skips"
+            await self.redis.incr(key)
+        except Exception as e:
+            logger.error("increment_skip_count_error", user_id=user_id, error=str(e))
+    
+    async def record_report(self, reported_user_id: int, reporter_id: int, reason: str = None) -> None:
+        """
+        Record when a user is reported.
+        
+        Args:
+            reported_user_id: User who was reported
+            reporter_id: User who made the report
+            reason: Optional reason for report
+        """
+        try:
+            import time
+            import json
+            
+            report_data = {
+                'reporter_id': reporter_id,
+                'reported_at': int(time.time()),
+                'reason': reason
+            }
+            
+            # Add to user's report history
+            key = f"stats:{reported_user_id}:reports"
+            await self.redis.lpush(key, json.dumps(report_data))
+            await self.redis.ltrim(key, 0, 49)  # Keep last 50 reports
+            
+            # Increment report count
+            count_key = f"stats:{reported_user_id}:report_count"
+            await self.redis.incr(count_key)
+        except Exception as e:
+            logger.error("record_report_error", reported_user_id=reported_user_id, error=str(e))
+    
     async def get_all_users(self) -> List[int]:
         """
         Get list of all users who have interacted with the bot.

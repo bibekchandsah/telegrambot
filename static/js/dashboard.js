@@ -351,6 +351,45 @@ async function viewUser(userId) {
         
         html += createDetailItem('Rating', ratingDisplay);
         
+        // Chat & Queue Statistics Section Header
+        html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">⏱️ Chat & Queue Statistics</h3></div>';
+        
+        // Format time durations
+        const formatDuration = (seconds) => {
+            if (!seconds) return '0s';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${secs}s`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        };
+        
+        html += createDetailItem('Average Chat Duration', formatDuration(user.avg_chat_duration || 0));
+        html += createDetailItem('Total Time in Chat', formatDuration(user.total_chat_time || 0));
+        html += createDetailItem('Average Queue Wait Time', formatDuration(user.avg_queue_time || 0));
+        html += createDetailItem('Total Queue Time', formatDuration(user.total_queue_time || 0));
+        
+        // Skip Rate Section Header
+        html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">⏭️ Skip Rate</h3></div>';
+        
+        html += createDetailItem('Skip Count (/next)', user.skip_count !== undefined ? user.skip_count : 'N/A');
+        
+        // Calculate skip rate
+        if (user.total_chats > 0 && user.skip_count !== undefined) {
+            const skipRate = ((user.skip_count / user.total_chats) * 100).toFixed(1);
+            html += createDetailItem('Skip Rate', `${skipRate}%`);
+        } else {
+            html += createDetailItem('Skip Rate', 'N/A');
+        }
+        
+        html += createDetailItem('Times Reported', user.report_count !== undefined ? user.report_count : '0');
+        
         // Status
         html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">📍 Current Status</h3></div>';
         html += createDetailItem('Current State', user.state || 'unknown');
@@ -365,6 +404,25 @@ async function viewUser(userId) {
         if (user.preferences && Object.keys(user.preferences).length > 0) {
             html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">⚙️ Preferences</h3></div>';
             html += createDetailItem('Preferences', JSON.stringify(user.preferences, null, 2), true);
+        }
+        
+        // Report History Section
+        if (user.recent_reports && user.recent_reports.length > 0) {
+            html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">🚨 Recent Report History</h3></div>';
+            
+            user.recent_reports.forEach((report, index) => {
+                const reportDate = new Date(report.timestamp * 1000).toLocaleString();
+                html += `
+                    <div style="grid-column: 1 / -1; background-color: #fff3cd; padding: 10px; margin-bottom: 8px; border-radius: 5px; border-left: 4px solid #ffc107;">
+                        <strong>Report #${index + 1}</strong><br>
+                        <small>Reported by User ID: ${report.reporter_id}</small><br>
+                        <small>Time: ${reportDate}</small>
+                    </div>
+                `;
+            });
+        } else if (user.report_count > 0) {
+            html += '<div style="grid-column: 1 / -1; margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"><h3 style="margin: 0 0 15px 0;">🚨 Report History</h3></div>';
+            html += `<div style="grid-column: 1 / -1;"><p>User has been reported ${user.report_count} time(s), but detailed history is not available.</p></div>`;
         }
         
         html += '</div>';

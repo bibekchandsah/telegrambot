@@ -342,6 +342,7 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /next command - skip to next partner."""
     user_id = update.effective_user.id
     matching: MatchingEngine = context.bot_data["matching"]
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
     
     try:
         # End current chat
@@ -353,6 +354,10 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Use /chat to find a partner!"
             )
             return
+        
+        # Track skip count
+        if admin_manager:
+            await admin_manager.increment_skip_count(user_id)
         
         # Show feedback prompt for previous partner
         await show_feedback_prompt(context, user_id, partner_id)

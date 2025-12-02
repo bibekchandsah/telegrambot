@@ -11,12 +11,13 @@ logger = get_logger(__name__)
 class MatchingEngine:
     """Handles user pairing and chat state management."""
     
-    def __init__(self, redis: RedisClient, profile_manager=None, preference_manager=None, feedback_manager=None):
+    def __init__(self, redis: RedisClient, profile_manager=None, preference_manager=None, feedback_manager=None, admin_manager=None):
         self.redis = redis
         self.queue = QueueManager(redis)
         self.profile_manager = profile_manager
         self.preference_manager = preference_manager
         self.feedback_manager = feedback_manager
+        self.admin_manager = admin_manager
     
     async def find_partner(self, user_id: int) -> Optional[int]:
         """
@@ -65,6 +66,13 @@ class MatchingEngine:
                 # Match found, create the pair
                 await self.create_pair(user_id, partner_id)
                 
+                # Track queue leave and chat start for both users
+                if self.admin_manager:
+                    await self.admin_manager.track_queue_leave(user_id)
+                    await self.admin_manager.track_queue_leave(partner_id)
+                    await self.admin_manager.track_chat_start(user_id)
+                    await self.admin_manager.track_chat_start(partner_id)
+                
                 # Increment chat counts for both users
                 if self.feedback_manager:
                     await self.feedback_manager.increment_chat_count(user_id)
@@ -74,6 +82,11 @@ class MatchingEngine:
             
             # No compatible partner found, add to queue
             await self.queue.join_queue(user_id)
+            
+            # Track queue join time
+            if self.admin_manager:
+                await self.admin_manager.track_queue_join(user_id)
+            
             return None
             
         except Exception as e:
@@ -301,6 +314,11 @@ class MatchingEngine:
             pipe.set(f"state:{partner_id}", "IDLE", ex=3600)
             
             await pipe.execute()
+            
+            # Track chat end for both users
+            if self.admin_manager:
+                await self.admin_manager.track_chat_end(user_id)
+                await self.admin_manager.track_chat_end(partner_id)
             
             logger.info(
                 "chat_ended",

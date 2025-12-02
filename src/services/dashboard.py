@@ -22,9 +22,44 @@ class DashboardService:
             Dict with statistics about users, chats, queue
         """
         try:
-            # Get all user IDs
+            # Get all user IDs using comprehensive scan (same as bot stats)
             all_users_set = await self.redis.smembers("bot:all_users")
-            total_users = len(all_users_set)
+            user_ids = set()
+            
+            # Add users from bot:all_users set
+            for user_id_bytes in all_users_set:
+                try:
+                    if isinstance(user_id_bytes, bytes):
+                        user_id_bytes = user_id_bytes.decode('utf-8')
+                    user_ids.add(int(user_id_bytes))
+                except (ValueError, AttributeError):
+                    continue
+            
+            # Scan for additional users from various Redis keys (fallback)
+            patterns = ["profile:*", "state:*", "rating:*", "preferences:*", "pair:*"]
+            
+            for pattern in patterns:
+                cursor = 0
+                while True:
+                    cursor, keys = await self.redis.scan(
+                        cursor=cursor,
+                        match=pattern,
+                        count=100
+                    )
+                    
+                    for key in keys:
+                        try:
+                            if isinstance(key, bytes):
+                                key = key.decode('utf-8')
+                            user_id = int(key.split(':')[1])
+                            user_ids.add(user_id)
+                        except (IndexError, ValueError):
+                            continue
+                    
+                    if cursor == 0:
+                        break
+            
+            total_users = len(user_ids)
             
             # Get users in queue
             queue_count = await self.redis.llen("queue:waiting")
@@ -407,6 +442,47 @@ class DashboardService:
             # Get user statistics
             message_count = await self.redis.get(f"stats:{user_id}:messages")
             user_info['message_count'] = int(message_count) if message_count else 0
+            
+            # Get advanced statistics
+            skip_count = await self.redis.get(f"stats:{user_id}:skips")
+            report_count = await self.redis.get(f"stats:{user_id}:report_count")
+            total_chat_time = await self.redis.get(f"stats:{user_id}:total_chat_time")
+            total_queue_time = await self.redis.get(f"stats:{user_id}:total_queue_time")
+            queue_sessions = await self.redis.get(f"stats:{user_id}:queue_sessions")
+            
+            user_info['skip_count'] = int(skip_count) if skip_count else 0
+            user_info['report_count'] = int(report_count) if report_count else 0
+            user_info['total_chat_time'] = int(total_chat_time) if total_chat_time else 0
+            user_info['total_queue_time'] = int(total_queue_time) if total_queue_time else 0
+            user_info['queue_sessions'] = int(queue_sessions) if queue_sessions else 0
+            
+            # Calculate average chat duration
+            durations_key = f"stats:{user_id}:chat_durations"
+            durations = await self.redis.lrange(durations_key, 0, -1)
+            if durations:
+                total_duration = sum(int(d) for d in durations if d)
+                user_info['avg_chat_duration'] = int(total_duration / len(durations)) if durations else 0
+            else:
+                user_info['avg_chat_duration'] = 0
+            
+            # Calculate average queue wait time
+            if user_info['queue_sessions'] > 0:
+                user_info['avg_queue_time'] = int(user_info['total_queue_time'] / user_info['queue_sessions'])
+            else:
+                user_info['avg_queue_time'] = 0
+            
+            # Get report history
+            reports_key = f"stats:{user_id}:reports"
+            reports = await self.redis.lrange(reports_key, 0, 9)  # Get last 10 reports
+            user_info['recent_reports'] = []
+            for report_bytes in reports:
+                try:
+                    if isinstance(report_bytes, bytes):
+                        report_bytes = report_bytes.decode('utf-8')
+                    report_data = json.loads(report_bytes)
+                    user_info['recent_reports'].append(report_data)
+                except:
+                    continue
             
             # Get user rating (includes total_chats which has historical data)
             rating_key = f"rating:{user_id}"

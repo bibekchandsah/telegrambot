@@ -84,6 +84,7 @@ async def post_init(application: Application):
             profile_manager=profile_manager,
             preference_manager=preference_manager,
             feedback_manager=feedback_manager,
+            admin_manager=admin_manager,
         )
         
         # Store instances in bot_data for access in handlers
