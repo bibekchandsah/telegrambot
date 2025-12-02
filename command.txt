@@ -19,3 +19,13 @@
 /warn
 /bannedlist
 /warninglist
+
+Usage: /blockmedia <type> [duration] [reason]
+Examples:
+/blockmedia photo 1h Inappropriate content
+/blockmedia video permanent Adult content
+/blockmedia sticker 24h Spam
+/blockmedia voice
+Examples:
+/unblockmedia photo
+/unblockmedia video

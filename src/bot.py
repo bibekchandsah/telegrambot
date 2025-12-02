@@ -62,6 +62,9 @@ from src.handlers.commands import (
     bannedlist_command,
     warninglist_command,
     cancel_ban_operation,
+    blockmedia_command,
+    unblockmedia_command,
+    blockedmedia_command,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -262,6 +265,9 @@ def main():
         application.add_handler(CommandHandler("checkban", checkban_command))
         application.add_handler(CommandHandler("bannedlist", bannedlist_command))
         application.add_handler(CommandHandler("warninglist", warninglist_command))
+        application.add_handler(CommandHandler("blockmedia", blockmedia_command))
+        application.add_handler(CommandHandler("unblockmedia", unblockmedia_command))
+        application.add_handler(CommandHandler("blockedmedia", blockedmedia_command))
         
         # Register feedback callback handler
         application.add_handler(

@@ -1727,6 +1727,10 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/checkban - Check if user is banned\n"
         "/bannedlist - View all banned users\n"
         "/warninglist - View users on warning list\n\n"
+        "**Media Blocking Commands:**\n"
+        "/blockmedia - Block a media type\n"
+        "/unblockmedia - Unblock a media type\n"
+        "/blockedmedia - List blocked media types\n\n"
         "**Statistics:**\n"
         "/stats - View bot statistics\n\n"
         "Use these commands responsibly."
@@ -2492,5 +2496,264 @@ async def cancel_ban_operation(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data.clear()
     await update.message.reply_text("❌ Operation cancelled.")
     return ConversationHandler.END
+
+
+async def blockmedia_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /blockmedia command - block a media type."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    # Check if arguments provided
+    args = context.args
+    if len(args) < 1:
+        help_msg = (
+            "🚫 **Block Media Type**\n\n"
+            "**Usage:**\n"
+            "`/blockmedia <type> [duration] [reason]`\n\n"
+            "**Media Types:**\n"
+            "• `photo` - Block photos/images\n"
+            "• `video` - Block videos\n"
+            "• `voice` - Block voice messages\n"
+            "• `audio` - Block audio files\n"
+            "• `document` - Block documents\n"
+            "• `sticker` - Block stickers\n"
+            "• `video_note` - Block video notes\n"
+            "• `location` - Block location sharing\n\n"
+            "**Duration (optional):**\n"
+            "• `1h` - 1 hour\n"
+            "• `6h` - 6 hours\n"
+            "• `24h` - 24 hours\n"
+            "• `7d` - 7 days\n"
+            "• `permanent` - Permanent (default)\n\n"
+            "**Examples:**\n"
+            "`/blockmedia photo 1h Inappropriate content`\n"
+            "`/blockmedia video permanent Adult content`\n"
+            "`/blockmedia sticker 24h Spam`"
+        )
+        await update.message.reply_text(help_msg, parse_mode="Markdown")
+        return
+    
+    media_type = args[0].lower()
+    valid_types = ["photo", "video", "voice", "audio", "document", "sticker", "video_note", "location"]
+    
+    if media_type not in valid_types:
+        await update.message.reply_text(
+            f"❌ Invalid media type: `{media_type}`\n\n"
+            f"Valid types: {', '.join(valid_types)}",
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Parse duration
+    duration_str = "permanent"
+    reason = "Content moderation"
+    
+    if len(args) >= 2:
+        duration_str = args[1].lower()
+        if duration_str not in ["1h", "6h", "24h", "7d", "30d", "permanent"]:
+            # If not a valid duration, treat as reason
+            reason = " ".join(args[1:])
+            duration_str = "permanent"
+        elif len(args) >= 3:
+            reason = " ".join(args[2:])
+    
+    # Convert duration to seconds
+    duration_map = {
+        "1h": 3600,
+        "6h": 21600,
+        "24h": 86400,
+        "7d": 604800,
+        "30d": 2592000,
+        "permanent": None
+    }
+    duration_seconds = duration_map.get(duration_str)
+    
+    # Block the media type
+    report_manager = context.bot_data.get("report_manager")
+    if not report_manager:
+        await update.message.reply_text("❌ Report manager not available.")
+        return
+    
+    try:
+        success = await report_manager.block_media_type(
+            media_type=media_type,
+            duration=duration_seconds,
+            reason=reason
+        )
+        
+        if success:
+            duration_text = "permanently" if duration_str == "permanent" else f"for {duration_str}"
+            await update.message.reply_text(
+                f"✅ **Media type blocked successfully**\n\n"
+                f"📸 Type: `{media_type}`\n"
+                f"⏱ Duration: {duration_text}\n"
+                f"📝 Reason: {reason}\n\n"
+                f"Users will now be blocked from sending {media_type}.",
+                parse_mode="Markdown"
+            )
+            
+            # Log the action
+            await report_manager.log_moderation_action(
+                admin_id=user_id,
+                action="media_blocked",
+                details=f"Blocked {media_type}: {reason} (Duration: {duration_str})"
+            )
+        else:
+            await update.message.reply_text("❌ Failed to block media type.")
+    except Exception as e:
+        logger.error("blockmedia_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred while blocking media type.")
+
+
+async def unblockmedia_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /unblockmedia command - unblock a media type."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    # Check if arguments provided
+    args = context.args
+    if len(args) < 1:
+        help_msg = (
+            "✅ **Unblock Media Type**\n\n"
+            "**Usage:**\n"
+            "`/unblockmedia <type>`\n\n"
+            "**Media Types:**\n"
+            "• `photo` - Unblock photos/images\n"
+            "• `video` - Unblock videos\n"
+            "• `voice` - Unblock voice messages\n"
+            "• `audio` - Unblock audio files\n"
+            "• `document` - Unblock documents\n"
+            "• `sticker` - Unblock stickers\n"
+            "• `video_note` - Unblock video notes\n"
+            "• `location` - Unblock location sharing\n\n"
+            "**Examples:**\n"
+            "`/unblockmedia photo`\n"
+            "`/unblockmedia video`"
+        )
+        await update.message.reply_text(help_msg, parse_mode="Markdown")
+        return
+    
+    media_type = args[0].lower()
+    valid_types = ["photo", "video", "voice", "audio", "document", "sticker", "video_note", "location"]
+    
+    if media_type not in valid_types:
+        await update.message.reply_text(
+            f"❌ Invalid media type: `{media_type}`\n\n"
+            f"Valid types: {', '.join(valid_types)}",
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Unblock the media type
+    report_manager = context.bot_data.get("report_manager")
+    if not report_manager:
+        await update.message.reply_text("❌ Report manager not available.")
+        return
+    
+    try:
+        success = await report_manager.unblock_media_type(media_type)
+        
+        if success:
+            await update.message.reply_text(
+                f"✅ **Media type unblocked successfully**\n\n"
+                f"📸 Type: `{media_type}`\n\n"
+                f"Users can now send {media_type} again.",
+                parse_mode="Markdown"
+            )
+            
+            # Log the action
+            await report_manager.log_moderation_action(
+                admin_id=user_id,
+                action="media_unblocked",
+                details=f"Unblocked {media_type}"
+            )
+        else:
+            await update.message.reply_text("❌ Failed to unblock media type.")
+    except Exception as e:
+        logger.error("unblockmedia_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred while unblocking media type.")
+
+
+async def blockedmedia_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /blockedmedia command - list all blocked media types."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    report_manager = context.bot_data.get("report_manager")
+    if not report_manager:
+        await update.message.reply_text("❌ Report manager not available.")
+        return
+    
+    try:
+        blocked_media = await report_manager.get_blocked_media_types()
+        
+        if not blocked_media:
+            await update.message.reply_text(
+                "✅ No media types are currently blocked.\n\n"
+                "All media types are allowed."
+            )
+            return
+        
+        from datetime import datetime
+        
+        message = f"🚫 **Blocked Media Types** ({len(blocked_media)} total)\n\n"
+        
+        for media in blocked_media:
+            media_type = media.get("media_type", "unknown")
+            reason = media.get("reason", "No reason")
+            blocked_at = datetime.fromtimestamp(media.get("blocked_at", 0)).strftime("%Y-%m-%d %H:%M")
+            
+            if media.get("expires_at"):
+                expires_at = datetime.fromtimestamp(media["expires_at"]).strftime("%Y-%m-%d %H:%M")
+                duration_sec = media["expires_at"] - media.get("blocked_at", 0)
+                
+                if duration_sec == 3600:
+                    duration = "1 hour"
+                elif duration_sec == 21600:
+                    duration = "6 hours"
+                elif duration_sec == 86400:
+                    duration = "24 hours"
+                elif duration_sec == 604800:
+                    duration = "7 days"
+                elif duration_sec == 2592000:
+                    duration = "30 days"
+                else:
+                    duration = f"{duration_sec // 3600} hours"
+                
+                message += f"📸 **{media_type}**\n"
+                message += f"   Duration: {duration}\n"
+                message += f"   Expires: {expires_at}\n"
+                message += f"   Reason: {reason}\n\n"
+            else:
+                message += f"📸 **{media_type}**\n"
+                message += f"   Duration: Permanent\n"
+                message += f"   Blocked: {blocked_at}\n"
+                message += f"   Reason: {reason}\n\n"
+        
+        message += "\nUse `/unblockmedia <type>` to unblock."
+        
+        await update.message.reply_text(message, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error("blockedmedia_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred while fetching blocked media types.")
 
 
