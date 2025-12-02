@@ -25,6 +25,7 @@ from src.handlers.commands import (
     stop_command,
     next_command,
     report_command,
+    report_callback,
     profile_command,
     editprofile_command,
     nickname_step,
@@ -127,9 +128,60 @@ async def post_init(application: Application):
             name=bot_info.first_name,
         )
         
+        # Start notification sender background job (if job_queue available)
+        if application.job_queue:
+            application.job_queue.run_repeating(
+                send_pending_notifications,
+                interval=5,  # Check every 5 seconds
+                first=1,
+                name="notification_sender"
+            )
+        else:
+            logger.warning("job_queue_not_available", message="Install python-telegram-bot[job-queue] for background jobs")
+        
     except Exception as e:
         logger.error("initialization_failed", error=str(e))
         raise
+
+
+async def send_pending_notifications(context: ContextTypes.DEFAULT_TYPE):
+    """Send pending notifications from Redis queue."""
+    try:
+        redis_client = context.bot_data.get("redis")
+        if not redis_client:
+            return
+        
+        # Get pending notifications
+        import json
+        notifications = await redis_client.lrange("bot:pending_notifications", 0, 9)  # Process 10 at a time
+        
+        for notification_bytes in notifications:
+            try:
+                if isinstance(notification_bytes, bytes):
+                    notification_bytes = notification_bytes.decode('utf-8')
+                notification = json.loads(notification_bytes)
+                
+                user_id = notification.get("user_id")
+                message = notification.get("message")
+                
+                if user_id and message:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=message,
+                        parse_mode='Markdown'
+                    )
+                    logger.info("notification_sent", user_id=user_id)
+                
+                # Remove from queue
+                await redis_client.lrem("bot:pending_notifications", 1, notification_bytes if isinstance(notification_bytes, bytes) else notification_bytes.encode())
+                
+            except Exception as e:
+                logger.error("send_notification_error", error=str(e))
+                # Remove failed notification to prevent infinite retries
+                await redis_client.lrem("bot:pending_notifications", 1, notification_bytes if isinstance(notification_bytes, bytes) else notification_bytes.encode())
+                
+    except Exception as e:
+        logger.error("pending_notifications_error", error=str(e))
 
 
 async def post_shutdown(application: Application):
@@ -213,6 +265,14 @@ def main():
             CallbackQueryHandler(
                 feedback_callback,
                 pattern="^feedback_(positive|negative|skip)$",
+            )
+        )
+        
+        # Register report callback handler
+        application.add_handler(
+            CallbackQueryHandler(
+                report_callback,
+                pattern="^report_(nudity|harassment|spam|scam|fake|other|cancel)$",
             )
         )
         

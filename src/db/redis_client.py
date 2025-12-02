@@ -168,6 +168,14 @@ class RedisClient:
             logger.error("redis_incr_error", key=key, error=str(e))
             raise
     
+    async def incrby(self, key: str, amount: int) -> int:
+        """Increment value by amount."""
+        try:
+            return await self.client.incrby(key, amount)
+        except RedisError as e:
+            logger.error("redis_incrby_error", key=key, error=str(e))
+            raise
+    
     async def expire(self, key: str, time: int) -> bool:
         """Set key expiration."""
         try:

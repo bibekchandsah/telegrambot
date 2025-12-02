@@ -171,7 +171,7 @@ class AdminManager:
                 
                 # Update total chat time
                 total_key = f"stats:{user_id}:total_chat_time"
-                await self.redis.incr(total_key, duration)
+                await self.redis.incrby(total_key, duration)
                 
                 # Add to chat durations list (for average calculation)
                 durations_key = f"stats:{user_id}:chat_durations"
@@ -214,7 +214,7 @@ class AdminManager:
                 
                 # Update total queue time
                 total_key = f"stats:{user_id}:total_queue_time"
-                await self.redis.incr(total_key, wait_time)
+                await self.redis.incrby(total_key, wait_time)
                 
                 # Increment queue sessions count
                 sessions_key = f"stats:{user_id}:queue_sessions"

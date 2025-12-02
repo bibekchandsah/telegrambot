@@ -62,6 +62,13 @@ function loadTabData(tab) {
         case 'in-queue':
             loadUsersInQueue();
             break;
+        case 'reports':
+            loadAllReports();
+            loadReportStats();
+            loadBlockedMedia();
+            loadBadWords();
+            loadModerationLogs();
+            break;
     }
 }
 
@@ -759,5 +766,583 @@ async function quickUnban(userId) {
     } catch (error) {
         console.error('Error unbanning user:', error);
         alert('Error unbanning user. Please try again.');
+    }
+}
+
+// ========== Reports & Safety Management Functions ==========
+
+// Store all reports for filtering
+let allReportsData = [];
+
+// Load all reports
+async function loadAllReports() {
+    const tbody = document.getElementById('reports-table');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading reports...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/reports/all');
+        const data = await response.json();
+        
+        if (data.success && data.reports) {
+            // Flatten reports into individual rows
+            allReportsData = [];
+            
+            data.reports.forEach(reportGroup => {
+                if (reportGroup.reports && reportGroup.reports.length > 0) {
+                    reportGroup.reports.forEach(individualReport => {
+                        allReportsData.push({
+                            reported_user_id: reportGroup.user_id,
+                            reporter_id: individualReport.reporter_id,
+                            flag: individualReport.flag,
+                            timestamp: individualReport.timestamp,
+                            status: 'pending', // Default to pending, will be updated below
+                            report_count: reportGroup.report_count
+                        });
+                    });
+                }
+            });
+            
+            // Fetch all individual statuses in one call
+            if (allReportsData.length > 0) {
+                const statusResponse = await fetch('/api/reports/all-individual-statuses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reports: allReportsData.map(r => ({
+                            reported_user_id: r.reported_user_id,
+                            reporter_id: r.reporter_id,
+                            timestamp: r.timestamp
+                        }))
+                    })
+                });
+                
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    if (statusData.success && statusData.statuses) {
+                        // Update statuses
+                        statusData.statuses.forEach(statusInfo => {
+                            const report = allReportsData.find(r =>
+                                r.reported_user_id == statusInfo.reported_user_id &&
+                                r.reporter_id == statusInfo.reporter_id &&
+                                r.timestamp == statusInfo.timestamp
+                            );
+                            if (report) {
+                                report.status = statusInfo.status;
+                            }
+                        });
+                    }
+                }
+            }
+            
+            // Apply filters and display
+            applyReportFilters();
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="no-data">Failed to load reports</td></tr>';
+            allReportsData = [];
+        }
+        
+        // Also load stats
+        loadReportStats();
+    } catch (error) {
+        console.error('Error loading reports:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">Error loading reports</td></tr>';
+        allReportsData = [];
+    }
+}
+
+// Apply filters to reports
+function applyReportFilters() {
+    const tbody = document.getElementById('reports-table');
+    const statusFilter = document.getElementById('filter-status').value;
+    const flagFilter = document.getElementById('filter-flag').value;
+    const userIdFilter = document.getElementById('filter-userid').value.trim().toLowerCase();
+    
+    // Filter reports
+    let filteredReports = allReportsData.filter(report => {
+        // Status filter
+        if (statusFilter !== 'all' && report.status !== statusFilter) {
+            return false;
+        }
+        
+        // Flag type filter
+        if (flagFilter !== 'all' && report.flag !== flagFilter) {
+            return false;
+        }
+        
+        // User ID filter
+        if (userIdFilter && !report.reported_user_id.toString().includes(userIdFilter)) {
+            return false;
+        }
+        
+        return true;
+    });
+    
+    // Sort by timestamp (newest first)
+    filteredReports.sort((a, b) => b.timestamp - a.timestamp);
+    
+    if (filteredReports.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No reports match the filters</td></tr>';
+        return;
+    }
+    
+    // Display filtered reports
+    tbody.innerHTML = '';
+    filteredReports.forEach(report => {
+        const row = document.createElement('tr');
+        
+        // Format flag with badge
+        const flagNames = {
+            'nudity': '🔞 Nudity',
+            'harassment': '😠 Harassment',
+            'spam': '📢 Spam',
+            'scam': '💰 Scam',
+            'fake': '🎭 Fake Profile',
+            'other': '❓ Other'
+        };
+        
+        const flagBadgeClass = {
+            'nudity': 'flag-nudity',
+            'harassment': 'flag-harassment',
+            'spam': 'flag-spam',
+            'scam': 'flag-scam',
+            'fake': 'flag-fake',
+            'other': 'flag-other'
+        };
+        
+        const flagDisplay = `<span class="flag-badge ${flagBadgeClass[report.flag]}">${flagNames[report.flag]}</span>`;
+        const dateDisplay = new Date(report.timestamp * 1000).toLocaleString();
+        
+        row.innerHTML = `
+            <td><strong>${report.reported_user_id}</strong></td>
+            <td>${report.reporter_id}</td>
+            <td>${flagDisplay}</td>
+            <td>${dateDisplay}</td>
+            <td><span class="status-badge ${report.status === 'approved' ? 'status-approved' : report.status === 'rejected' ? 'status-rejected' : 'status-pending'}">${report.status || 'pending'}</span></td>
+            <td>
+                <button class="btn-success" onclick="approveIndividualReport('${report.reported_user_id}', '${report.reporter_id}', ${report.timestamp})" ${report.status === 'approved' ? 'disabled' : ''}>✓ Approve</button>
+                <button class="btn-danger" onclick="rejectIndividualReport('${report.reported_user_id}', '${report.reporter_id}', ${report.timestamp})" ${report.status === 'rejected' ? 'disabled' : ''}>✗ Reject</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Clear all filters
+function clearReportFilters() {
+    document.getElementById('filter-status').value = 'pending';
+    document.getElementById('filter-flag').value = 'all';
+    document.getElementById('filter-userid').value = '';
+    applyReportFilters();
+}
+
+// Approve individual report
+async function approveIndividualReport(reportedUserId, reporterId, timestamp) {
+    const report = allReportsData.find(r => 
+        r.reported_user_id == reportedUserId && 
+        r.reporter_id == reporterId && 
+        r.timestamp == timestamp
+    );
+    
+    let confirmMsg = `Approve this report?\n\nReported User: ${reportedUserId}\nReporter: ${reporterId}`;
+    if (report && report.status === 'rejected') {
+        confirmMsg = `Change status from REJECTED to APPROVED?\n\nReported User: ${reportedUserId}\nReporter: ${reporterId}`;
+    }
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/reports/approve-individual', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                reported_user_id: reportedUserId,
+                reporter_id: reporterId,
+                timestamp: timestamp,
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update the specific report status in memory
+            if (report) {
+                report.status = 'approved';
+            }
+            
+            // Reload stats to update counts
+            loadReportStats();
+            
+            // Re-apply filters to update display
+            applyReportFilters();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to approve report'));
+        }
+    } catch (error) {
+        console.error('Error approving report:', error);
+        alert('Error approving report. Please try again.');
+    }
+}
+
+// Reject individual report
+async function rejectIndividualReport(reportedUserId, reporterId, timestamp) {
+    const report = allReportsData.find(r => 
+        r.reported_user_id == reportedUserId && 
+        r.reporter_id == reporterId && 
+        r.timestamp == timestamp
+    );
+    
+    let confirmMsg = `Reject this report?\n\nReported User: ${reportedUserId}\nReporter: ${reporterId}`;
+    if (report && report.status === 'approved') {
+        confirmMsg = `Change status from APPROVED to REJECTED?\n\nReported User: ${reportedUserId}\nReporter: ${reporterId}`;
+    }
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/reports/reject-individual', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                reported_user_id: reportedUserId,
+                reporter_id: reporterId,
+                timestamp: timestamp,
+                admin_id: 'admin',
+                reason: 'Invalid report'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update the specific report status in memory
+            if (report) {
+                report.status = 'rejected';
+            }
+            
+            // Reload stats to update counts
+            loadReportStats();
+            
+            // Re-apply filters to update display
+            applyReportFilters();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to reject report'));
+        }
+    } catch (error) {
+        console.error('Error rejecting report:', error);
+        alert('Error rejecting report. Please try again.');
+    }
+}
+
+// Load report statistics
+async function loadReportStats() {
+    try {
+        const response = await fetch('/api/reports/stats');
+        const data = await response.json();
+        
+        if (data.success && data.stats) {
+            document.getElementById('total-reports-count').textContent = data.stats.total_reports || 0;
+            document.getElementById('reported-users-count').textContent = data.stats.reported_users || 0;
+            document.getElementById('pending-reports-count').textContent = data.stats.pending_reports || 0;
+            
+            // Frozen users count will be updated by loadFrozenUsers
+        }
+    } catch (error) {
+        console.error('Error loading report stats:', error);
+    }
+}
+
+// Load blocked media types
+async function loadBlockedMedia() {
+    const tbody = document.getElementById('blocked-media-table');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading blocked media...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/safety/blocked-media');
+        const data = await response.json();
+        
+        if (data.blocked_media) {
+            if (data.blocked_media.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No blocked media types</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            data.blocked_media.forEach(media => {
+                const row = document.createElement('tr');
+                const blockedAt = new Date(media.blocked_at * 1000).toLocaleString();
+                const expiresAt = media.expires_at ? new Date(media.expires_at * 1000).toLocaleString() : 'Never';
+                const duration = media.duration || 'Permanent';
+                
+                // Media type icons
+                const icons = {
+                    photo: '📷',
+                    video: '🎥',
+                    voice: '🎤',
+                    sticker: '😊',
+                    gif: '🎞️',
+                    document: '📄'
+                };
+                const icon = icons[media.media_type] || '📎';
+                
+                row.innerHTML = `
+                    <td>${icon} ${media.media_type}</td>
+                    <td>${blockedAt}</td>
+                    <td>${media.reason || 'No reason provided'}</td>
+                    <td>${duration}</td>
+                    <td>${expiresAt}</td>
+                    <td><button class="btn-primary" onclick="unblockMedia('${media.media_type}')">✓ Unblock</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="no-data">Failed to load blocked media</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading blocked media:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">Error loading blocked media</td></tr>';
+    }
+}
+
+// Block media type action
+async function blockMediaAction() {
+    const mediaTypeSelect = document.getElementById('block-media-type');
+    const reasonInput = document.getElementById('block-media-reason');
+    const durationSelect = document.getElementById('block-media-duration');
+    
+    const mediaType = mediaTypeSelect.value;
+    const reason = reasonInput.value.trim();
+    const duration = durationSelect.value;
+    
+    if (!mediaType) {
+        alert('Please select a media type to block');
+        return;
+    }
+    
+    if (!reason) {
+        alert('Please provide a reason for blocking');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to BLOCK ${mediaType} media?\n\nReason: ${reason}\nDuration: ${duration || 'Permanent'}`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/safety/block-media', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                media_type: mediaType,
+                reason: reason,
+                duration: duration || null,
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'Media type blocked successfully');
+            mediaTypeSelect.value = '';
+            reasonInput.value = '';
+            durationSelect.value = '';
+            loadBlockedMedia();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to block media'));
+        }
+    } catch (error) {
+        console.error('Error blocking media:', error);
+        alert('Error blocking media. Please try again.');
+    }
+}
+
+// Unblock media type
+async function unblockMedia(mediaType) {
+    if (!confirm(`Are you sure you want to UNBLOCK ${mediaType} media?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/safety/unblock-media', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                media_type: mediaType,
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'Media type unblocked successfully');
+            loadBlockedMedia();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to unblock media'));
+        }
+    } catch (error) {
+        console.error('Error unblocking media:', error);
+        alert('Error unblocking media. Please try again.');
+    }
+}
+
+// Load bad words
+async function loadBadWords() {
+    const container = document.getElementById('bad-words-container');
+    container.innerHTML = '<p class="loading">Loading bad words...</p>';
+    
+    try {
+        const response = await fetch('/api/safety/bad-words');
+        const data = await response.json();
+        
+        if (data.bad_words) {
+            if (data.bad_words.length === 0) {
+                container.innerHTML = '<p class="no-data">No bad words in filter</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            data.bad_words.forEach(word => {
+                const badge = document.createElement('div');
+                badge.className = 'bad-word-badge';
+                badge.innerHTML = `
+                    ${word}
+                    <button class="remove-btn" onclick="removeBadWord('${word.replace(/'/g, "\\'")}')">✕</button>
+                `;
+                container.appendChild(badge);
+            });
+        } else {
+            container.innerHTML = '<p class="no-data">Failed to load bad words</p>';
+        }
+    } catch (error) {
+        console.error('Error loading bad words:', error);
+        container.innerHTML = '<p class="no-data">Error loading bad words</p>';
+    }
+}
+
+// Add bad word action
+async function addBadWordAction() {
+    const input = document.getElementById('new-bad-word');
+    const word = input.value.trim().toLowerCase();
+    
+    if (!word) {
+        alert('Please enter a word or phrase to add');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to add "${word}" to the bad word filter?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/safety/bad-words/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                word: word,
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'Bad word added successfully');
+            input.value = '';
+            loadBadWords();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to add bad word'));
+        }
+    } catch (error) {
+        console.error('Error adding bad word:', error);
+        alert('Error adding bad word. Please try again.');
+    }
+}
+
+// Remove bad word
+async function removeBadWord(word) {
+    if (!confirm(`Are you sure you want to remove "${word}" from the bad word filter?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/safety/bad-words/remove', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                word: word,
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message || 'Bad word removed successfully');
+            loadBadWords();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to remove bad word'));
+        }
+    } catch (error) {
+        console.error('Error removing bad word:', error);
+        alert('Error removing bad word. Please try again.');
+    }
+}
+
+// Load moderation logs
+async function loadModerationLogs() {
+    const tbody = document.getElementById('moderation-logs-table');
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading moderation logs...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/safety/moderation-logs');
+        const data = await response.json();
+        
+        if (data.logs) {
+            if (data.logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="no-data">No moderation logs</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            // Show most recent logs first
+            data.logs.reverse().forEach(log => {
+                const row = document.createElement('tr');
+                const timestamp = new Date(log.timestamp * 1000).toLocaleString();
+                
+                row.innerHTML = `
+                    <td>${timestamp}</td>
+                    <td>${log.admin_id}</td>
+                    <td><span class="action-badge">${log.action}</span></td>
+                    <td>${log.target_user || 'N/A'}</td>
+                    <td style="font-size: 0.9em;">${log.details || 'No details'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" class="no-data">Failed to load logs</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading moderation logs:', error);
+        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error loading logs</td></tr>';
     }
 }

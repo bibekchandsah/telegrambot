@@ -111,7 +111,7 @@ Profile contains:
     - Failed message forwarding logs
     - Usage heatmap by hour/time/day
 
-5. Report & Safety Management
+5. Report & Safety Management ()
 - Admin should manage:
     - View all user reports
     - Flags (Nudity, Harassment, Ad, Scam)
@@ -169,14 +169,6 @@ Profile contains:
 
 
 
-Analytics:
-    - users online
-    - average chat duration
-    - messages per minute
-    - country stats
-    - gender distribution
-
-
 
 
 for docker
@@ -199,6 +191,13 @@ docker run -d -p 6379:6379 --name redis-dev redis:7-alpine
 
 # 3. Run the bot
 python -m src.bot
+python src/bot.py
+
+# web view 
+python admin_dashboard.py
+
+# clean reports
+python cleanup_reports.py
 
 
 

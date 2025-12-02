@@ -1,6 +1,7 @@
 """Command handlers for the bot."""
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
+from src.db.redis_client import RedisClient
 from src.services.matching import MatchingEngine
 from src.services.queue import QueueFullError
 from src.services.profile import (
@@ -508,18 +509,194 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /report command - report abuse."""
-    await update.message.reply_text(
-        "⚠️ **Report Abuse**\n\n"
-        "To report your chat partner:\n"
-        "1. Use /stop to end the chat\n"
-        "2. Contact @YourSupportUsername with details\n\n"
-        "We take reports seriously and will investigate."
-    )
+    user_id = update.effective_user.id
+    redis_client: RedisClient = context.bot_data.get("redis")
     
-    logger.info(
-        "report_command",
-        user_id=update.effective_user.id,
-    )
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable")
+        return
+    
+    try:
+        # Check if user is in chat
+        partner_key = f"pair:{user_id}"
+        partner_id_bytes = await redis_client.get(partner_key)
+        
+        if not partner_id_bytes:
+            await update.message.reply_text(
+                "⚠️ **No Active Chat**\n\n"
+                "You can only report users while in an active chat.\n"
+                "Start a chat with /start and match with someone first."
+            )
+            return
+        
+        partner_id = int(partner_id_bytes.decode('utf-8'))
+        
+        # Store partner ID in user context for callback
+        context.user_data['report_target'] = partner_id
+        
+        # Show report reasons as inline keyboard
+        keyboard = [
+            [InlineKeyboardButton("🔞 Nudity / Explicit Content", callback_data="report_nudity")],
+            [InlineKeyboardButton("😠 Harassment / Abuse", callback_data="report_harassment")],
+            [InlineKeyboardButton("📧 Spam / Advertising", callback_data="report_spam")],
+            [InlineKeyboardButton("💰 Scam / Fraud", callback_data="report_scam")],
+            [InlineKeyboardButton("🎭 Fake Profile", callback_data="report_fake")],
+            [InlineKeyboardButton("❓ Other Reason", callback_data="report_other")],
+            [InlineKeyboardButton("❌ Cancel", callback_data="report_cancel")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "⚠️ **Report Your Chat Partner**\n\n"
+            f"You are about to report User ID: `{partner_id}`\n\n"
+            "Please select the reason for reporting:\n\n"
+            "⚠️ **Important Notes:**\n"
+            "• False reports may result in penalties\n"
+            "• Your report will be reviewed by moderators\n"
+            "• You can continue or end the chat after reporting",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+        
+        logger.info(
+            "report_command",
+            user_id=user_id,
+            partner_id=partner_id
+        )
+        
+    except Exception as e:
+        logger.error("report_command_error", user_id=user_id, error=str(e))
+        await update.message.reply_text(
+            "❌ Error processing report. Please try again."
+        )
+
+
+async def report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle report reason selection callbacks."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    redis_client: RedisClient = context.bot_data.get("redis")
+    
+    if not redis_client:
+        await query.edit_message_text("❌ Service unavailable")
+        return
+    
+    try:
+        # Get the target user from context
+        partner_id = context.user_data.get('report_target')
+        if not partner_id:
+            await query.edit_message_text(
+                "❌ Report session expired. Please use /report again."
+            )
+            return
+        
+        # Handle cancel
+        if query.data == "report_cancel":
+            await query.edit_message_text(
+                "❌ Report cancelled.\n\n"
+                "You can report anytime using /report while in a chat."
+            )
+            context.user_data.pop('report_target', None)
+            return
+        
+        # Extract report reason from callback data
+        report_flags = {
+            "report_nudity": "nudity",
+            "report_harassment": "harassment",
+            "report_spam": "spam",
+            "report_scam": "scam",
+            "report_fake": "fake",
+            "report_other": "other"
+        }
+        
+        flag = report_flags.get(query.data)
+        if not flag:
+            await query.edit_message_text("❌ Invalid report reason")
+            return
+        
+        # Save the report to Redis
+        import json
+        import time
+        
+        # Create report data
+        report_data = {
+            "reporter_id": user_id,
+            "reported_id": partner_id,
+            "flag": flag,
+            "timestamp": int(time.time())
+        }
+        
+        # Store report in reported user's report list
+        reports_key = f"stats:{partner_id}:reports"
+        await redis_client.lpush(reports_key, json.dumps(report_data))
+        
+        # Increment report count
+        count_key = f"stats:{partner_id}:report_count"
+        new_count = await redis_client.incr(count_key)
+        
+        # Flag type counts
+        flag_key = f"stats:{partner_id}:report_flags:{flag}"
+        await redis_client.incr(flag_key)
+        
+        # Clean up context
+        context.user_data.pop('report_target', None)
+        
+        flag_names = {
+            "nudity": "Nudity / Explicit Content",
+            "harassment": "Harassment / Abuse",
+            "spam": "Spam / Advertising",
+            "scam": "Scam / Fraud",
+            "fake": "Fake Profile",
+            "other": "Other Reason"
+        }
+        
+        await query.edit_message_text(
+            f"✅ **Report Submitted**\n\n"
+            f"You have reported User ID: `{partner_id}`\n"
+            f"Reason: **{flag_names[flag]}**\n\n"
+            f"📋 Report #{new_count} for this user\n\n"
+            f"Thank you for helping keep our community safe.\n"
+            f"Our moderation team will review this report.\n\n"
+            f"You can:\n"
+            f"• Continue the chat\n"
+            f"• Use /next to find a new partner\n"
+            f"• Use /stop to end the chat",
+            parse_mode="Markdown"
+        )
+        
+        logger.info(
+            "report_submitted",
+            reporter_id=user_id,
+            reported_id=partner_id,
+            flag=flag,
+            total_reports=new_count
+        )
+        
+        # Check if user should be auto-banned (threshold: 5 reports)
+        if new_count >= 5:
+            admin_manager: AdminManager = context.bot_data.get("admin_manager")
+            if admin_manager:
+                # Auto-ban for 24 hours after 5 reports
+                await admin_manager.ban_user(
+                    user_id=partner_id,
+                    banned_by=0,  # System ban
+                    reason="Multiple user reports",
+                    duration=86400,  # 24 hours
+                    is_auto_ban=True
+                )
+                logger.warning(
+                    "user_auto_banned",
+                    user_id=partner_id,
+                    report_count=new_count
+                )
+        
+    except Exception as e:
+        logger.error("report_callback_error", user_id=user_id, error=str(e))
+        await query.edit_message_text(
+            "❌ Error submitting report. Please try again."
+        )
 
 
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
