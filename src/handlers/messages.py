@@ -24,6 +24,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     activity_manager: ActivityManager = context.bot_data.get("activity_manager")
     media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
     admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    report_manager = context.bot_data.get("report_manager")
     
     # Check if user is banned
     if admin_manager:
@@ -110,6 +111,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             media_type = "video_note"
         elif update.message.location:
             media_type = "location"
+        
+        # Check if media type is globally blocked by admin
+        if media_type and report_manager:
+            is_blocked = await report_manager.is_media_blocked(media_type)
+            if is_blocked:
+                media_names = {
+                    "photo": "Photos",
+                    "video": "Videos",
+                    "voice": "Voice messages",
+                    "audio": "Audio files",
+                    "document": "Documents",
+                    "sticker": "Stickers",
+                    "video_note": "Video notes",
+                    "location": "Locations"
+                }
+                media_name = media_names.get(media_type, media_type.title())
+                await update.message.reply_text(
+                    f"🚫 **{media_name} are currently blocked**\n\n"
+                    f"The admin has temporarily disabled {media_name.lower()} on this platform.\n\n"
+                    "💡 Try sending a text message instead!",
+                    parse_mode="Markdown",
+                )
+                return
         
         # Check if partner allows this media type
         if media_type and media_manager:

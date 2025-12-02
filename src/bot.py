@@ -18,6 +18,7 @@ from src.services.feedback import FeedbackManager
 from src.services.activity import ActivityManager
 from src.services.media_preferences import MediaPreferenceManager
 from src.services.admin import AdminManager
+from src.services.reports import ReportManager
 from src.handlers.commands import (
     start_command,
     help_command,
@@ -99,6 +100,7 @@ async def post_init(application: Application):
         activity_manager = ActivityManager(redis_client)
         media_manager = MediaPreferenceManager(redis_client)
         admin_manager = AdminManager(redis_client, Config.ADMIN_IDS)
+        report_manager = ReportManager(redis_client)
         matching_engine = MatchingEngine(
             redis_client,
             profile_manager=profile_manager,
@@ -116,6 +118,7 @@ async def post_init(application: Application):
         application.bot_data["activity_manager"] = activity_manager
         application.bot_data["media_manager"] = media_manager
         application.bot_data["admin_manager"] = admin_manager
+        application.bot_data["report_manager"] = report_manager
         
         logger.info("bot_initialized", bot_username=application.bot.username)
         

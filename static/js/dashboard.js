@@ -1082,7 +1082,25 @@ async function loadBlockedMedia() {
                 const row = document.createElement('tr');
                 const blockedAt = new Date(media.blocked_at * 1000).toLocaleString();
                 const expiresAt = media.expires_at ? new Date(media.expires_at * 1000).toLocaleString() : 'Never';
-                const duration = media.duration || 'Permanent';
+                
+                // Calculate duration display
+                let duration = 'Permanent';
+                if (media.expires_at && media.blocked_at) {
+                    const durationSeconds = media.expires_at - media.blocked_at;
+                    if (durationSeconds === 3600) duration = '1 Hour';
+                    else if (durationSeconds === 21600) duration = '6 Hours';
+                    else if (durationSeconds === 86400) duration = '24 Hours';
+                    else if (durationSeconds === 604800) duration = '7 Days';
+                    else if (durationSeconds === 2592000) duration = '30 Days';
+                    else {
+                        // Format custom duration
+                        const hours = Math.floor(durationSeconds / 3600);
+                        const days = Math.floor(durationSeconds / 86400);
+                        if (days > 0) duration = `${days} Day${days > 1 ? 's' : ''}`;
+                        else if (hours > 0) duration = `${hours} Hour${hours > 1 ? 's' : ''}`;
+                        else duration = `${durationSeconds} Seconds`;
+                    }
+                }
                 
                 // Media type icons
                 const icons = {
@@ -1147,7 +1165,7 @@ async function blockMediaAction() {
             body: JSON.stringify({
                 media_type: mediaType,
                 reason: reason,
-                duration: duration || null,
+                duration: duration || 'permanent',
                 admin_id: 'admin'
             })
         });
