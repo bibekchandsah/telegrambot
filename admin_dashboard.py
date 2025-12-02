@@ -1021,6 +1021,238 @@ def get_moderation_logs():
         return jsonify({"error": str(e)}), 500
 
 
+# ============================================
+# BOT SETTINGS & CONFIGURATION ENDPOINTS
+# ============================================
+
+@app.route('/api/settings/bot')
+def get_bot_settings():
+    """Get bot configuration settings."""
+    try:
+        redis_client, _, _, _, _ = get_thread_services()
+        
+        # Define default messages
+        default_welcome = """👋 Welcome to Anonymous Random Chat, {first_name}!
+
+🎭 Connect with random strangers anonymously.
+💬 Chat with anyone from around the world.
+
+📋 **Commands:**
+/profile - View your profile
+/editprofile - Create/edit your profile
+/preferences - Set matching filters
+/mediasettings - Control media privacy
+/rating - View your rating
+/chat - Start searching for a partner
+/stop - End current chat
+/next - Skip to next partner
+/help - Show help message
+
+🔒 Your identity remains completely anonymous.
+💡 Create your profile first with /editprofile!
+⚙️ Customize matching with /preferences!
+⭐ Rate partners to improve matching!
+Ready to start? Use /chat to find a partner!"""
+
+        default_match_found = """✅ **Partner found!**
+
+👤 **Partner's Profile:**
+📝 [Nickname]
+👤 [Gender]
+🌍 [Country]
+
+👋 Say hi and start chatting!
+Use /next to skip or /stop to end."""
+
+        default_chat_end = """👋 **Chat ended.**
+
+Use /chat to find a new partner!"""
+
+        default_partner_left = """⚠️ **Partner has left the chat.**
+
+Use /chat to find a new partner!"""
+        
+        # Get all settings with defaults
+        settings = {
+            "welcome_message": run_async(redis_client.get("bot:settings:welcome_message")) or None,
+            "match_found_message": run_async(redis_client.get("bot:settings:match_found_message")) or None,
+            "chat_end_message": run_async(redis_client.get("bot:settings:chat_end_message")) or None,
+            "partner_left_message": run_async(redis_client.get("bot:settings:partner_left_message")) or None,
+            "inactivity_duration": int(run_async(redis_client.get("bot:settings:inactivity_duration")) or 300),
+            "maintenance_mode": bool(int(run_async(redis_client.get("bot:settings:maintenance_mode")) or 0)),
+            "registrations_enabled": bool(int(run_async(redis_client.get("bot:settings:registrations_enabled")) or 1)),
+            "default_welcome": default_welcome,
+            "default_match_found": default_match_found,
+            "default_chat_end": default_chat_end,
+            "default_partner_left": default_partner_left
+        }
+        
+        # Decode bytes to strings if needed
+        for key in ["welcome_message", "match_found_message", "chat_end_message", "partner_left_message"]:
+            if settings[key] and isinstance(settings[key], bytes):
+                settings[key] = settings[key].decode('utf-8')
+        
+        return jsonify({
+            "success": True,
+            "settings": settings
+        })
+    except Exception as e:
+        logger.error("get_bot_settings_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/settings/bot/update', methods=['POST'])
+def update_bot_settings():
+    """Update bot configuration settings."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _ = get_thread_services()
+        
+        updates = []
+        
+        # Update partner left message
+        if 'partner_left_message' in data and data['partner_left_message']:
+            msg = data['partner_left_message']
+            run_async(redis_client.set("bot:settings:partner_left_message", msg))
+            updates.append("partner_left_message")
+        
+        # Update welcome message
+        if 'welcome_message' in data and data['welcome_message']:
+            run_async(redis_client.set("bot:settings:welcome_message", data['welcome_message']))
+            updates.append("welcome message")
+        
+        # Update match found message
+        if 'match_found_message' in data and data['match_found_message']:
+            run_async(redis_client.set("bot:settings:match_found_message", data['match_found_message']))
+            updates.append("match found message")
+        
+        # Update chat end message
+        if 'chat_end_message' in data and data['chat_end_message']:
+            run_async(redis_client.set("bot:settings:chat_end_message", data['chat_end_message']))
+            updates.append("chat end message")
+        
+        # Update inactivity duration
+        if 'inactivity_duration' in data:
+            duration = int(data['inactivity_duration'])
+            if duration < 60:
+                return jsonify({"error": "Inactivity duration must be at least 60 seconds"}), 400
+            run_async(redis_client.set("bot:settings:inactivity_duration", duration))
+            updates.append(f"inactivity duration ({duration}s)")
+        
+        # Update maintenance mode
+        if 'maintenance_mode' in data:
+            mode = 1 if data['maintenance_mode'] else 0
+            run_async(redis_client.set("bot:settings:maintenance_mode", mode))
+            updates.append(f"maintenance mode ({'ON' if mode else 'OFF'})")
+        
+        # Update registrations enabled
+        if 'registrations_enabled' in data:
+            enabled = 1 if data['registrations_enabled'] else 0
+            run_async(redis_client.set("bot:settings:registrations_enabled", enabled))
+            updates.append(f"registrations ({'enabled' if enabled else 'disabled'})")
+        
+        # Log the changes
+        if report_manager and updates:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="bot_settings_updated",
+                details=f"Updated: {', '.join(updates)}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": "Settings updated successfully",
+            "updated": updates
+        })
+    except Exception as e:
+        logger.error("update_bot_settings_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/settings/actions/force-logout', methods=['POST'])
+def force_logout_all():
+    """Force logout all users."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, dashboard_service, _, report_manager, _ = get_thread_services()
+        
+        # Get all active users
+        all_users = run_async(dashboard_service.get_all_users_paginated(1, 10000))
+        user_ids = [u['user_id'] for u in all_users.get('users', [])]
+        
+        # Clear all active sessions
+        logout_count = 0
+        for user_id in user_ids:
+            # Remove from queue
+            queue_key = f"queue:{user_id}"
+            if run_async(redis_client.exists(queue_key)):
+                run_async(redis_client.delete(queue_key))
+                logout_count += 1
+            
+            # Remove chat partner
+            partner_key = f"chat:{user_id}"
+            if run_async(redis_client.exists(partner_key)):
+                run_async(redis_client.delete(partner_key))
+                logout_count += 1
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="force_logout_all",
+                details=f"Forced logout of {logout_count} active sessions"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Successfully logged out {logout_count} active sessions"
+        })
+    except Exception as e:
+        logger.error("force_logout_all_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/settings/actions/reset-queue', methods=['POST'])
+def reset_queue():
+    """Reset the entire queue."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _ = get_thread_services()
+        
+        # Get all queue keys
+        queue_keys = run_async(redis_client.keys("queue:*"))
+        queue_count = len(queue_keys)
+        
+        # Delete all queue entries
+        if queue_keys:
+            run_async(redis_client.delete(*queue_keys))
+        
+        # Also clear the main queue list if it exists
+        run_async(redis_client.delete("bot:queue"))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="queue_reset",
+                details=f"Reset queue, removed {queue_count} entries"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Queue reset successfully, removed {queue_count} entries"
+        })
+    except Exception as e:
+        logger.error("reset_queue_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/health')
 def health():
     """Health check endpoint."""

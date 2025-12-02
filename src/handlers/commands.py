@@ -50,6 +50,19 @@ UNBAN_USER_ID = 10
 WARNING_USER_ID, WARNING_REASON = range(11, 13)
 
 
+async def get_custom_message(context: ContextTypes.DEFAULT_TYPE, message_key: str, default: str) -> str:
+    """Get custom message from Redis or return default."""
+    try:
+        redis_client: RedisClient = context.bot_data.get("redis")
+        if redis_client:
+            custom_msg = await redis_client.get(f"bot:settings:{message_key}")
+            if custom_msg:
+                return custom_msg.decode('utf-8') if isinstance(custom_msg, bytes) else custom_msg
+    except Exception as e:
+        logger.error(f"get_custom_message_error", key=message_key, error=str(e))
+    return default
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
     user = update.effective_user
@@ -67,7 +80,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_premium=user.is_premium
         )
     
-    welcome_message = (
+    default_welcome = (
         f"👋 Welcome to Anonymous Random Chat, {user.first_name}!\n\n"
         "🎭 Connect with random strangers anonymously.\n"
         "💬 Chat with anyone from around the world.\n\n"
@@ -87,6 +100,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⭐ Rate partners to improve matching!\n"
         "Ready to start? Use /chat to find a partner!"
     )
+    
+    welcome_message = await get_custom_message(context, "welcome_message", default_welcome)
+    # Replace {first_name} placeholder if present
+    welcome_message = welcome_message.replace("{first_name}", user.first_name)
     
     await update.message.reply_text(
         welcome_message,
@@ -233,15 +250,33 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 partner_profile = await profile_manager.get_profile(partner_id)
                 user_profile = await profile_manager.get_profile(user_id)
             
-            # Send match notification to user with partner's profile
-            match_msg = "✅ **Partner found!**\n\n"
+            # Get custom match found message template (without profile data)
+            default_match_template = (
+                "✅ **Partner found!**\n\n"
+                "👤 **Partner's Profile:**\n"
+                "📝 [Nickname]\n"
+                "👤 [Gender]\n"
+                "🌍 [Country]\n\n"
+                "👋 Say hi and start chatting!\n"
+                "Use /next to skip or /stop to end."
+            )
+            
+            match_msg = await get_custom_message(context, "match_found_message", default_match_template)
+            
+            # Replace profile placeholders with actual data if profile exists
             if partner_profile:
-                match_msg += f"👤 **Partner's Profile:**\n"
-                match_msg += f"📝 {partner_profile.nickname}\n"
-                match_msg += f"{'👨' if partner_profile.gender == 'Male' else '👩' if partner_profile.gender == 'Female' else '🧑'} {partner_profile.gender}\n"
-                match_msg += f"🌍 {partner_profile.country}\n"
-            match_msg += "\n👋 Say hi and start chatting!\n"
-            match_msg += "Use /next to skip or /stop to end."
+                match_msg = match_msg.replace("[Nickname]", partner_profile.nickname)
+                match_msg = match_msg.replace("[Gender]", partner_profile.gender)
+                match_msg = match_msg.replace("[Country]", partner_profile.country)
+                match_msg = match_msg.replace("{nickname}", partner_profile.nickname)
+                match_msg = match_msg.replace("{gender}", partner_profile.gender)
+                match_msg = match_msg.replace("{country}", partner_profile.country)
+            else:
+                # If no profile, remove placeholder lines
+                match_msg = match_msg.replace("👤 **Partner's Profile:**\n", "")
+                match_msg = match_msg.replace("📝 [Nickname]\n", "")
+                match_msg = match_msg.replace("👤 [Gender]\n", "")
+                match_msg = match_msg.replace("🌍 [Country]\n\n", "\n")
             
             await update.message.reply_text(
                 match_msg,
@@ -249,14 +284,32 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
             # Send match notification to partner with user's profile
-            partner_match_msg = "✅ **Partner found!**\n\n"
+            default_partner_template = (
+                "✅ **Partner found!**\n\n"
+                "👤 **Partner's Profile:**\n"
+                "📝 [Nickname]\n"
+                "👤 [Gender]\n"
+                "🌍 [Country]\n\n"
+                "👋 Say hi and start chatting!\n"
+                "Use /next to skip or /stop to end."
+            )
+            
+            partner_match_msg = await get_custom_message(context, "match_found_message", default_partner_template)
+            
+            # Replace profile placeholders with actual data if profile exists
             if user_profile:
-                partner_match_msg += f"👤 **Partner's Profile:**\n"
-                partner_match_msg += f"📝 {user_profile.nickname}\n"
-                partner_match_msg += f"{'👨' if user_profile.gender == 'Male' else '👩' if user_profile.gender == 'Female' else '🧑'} {user_profile.gender}\n"
-                partner_match_msg += f"🌍 {user_profile.country}\n"
-            partner_match_msg += "\n👋 Say hi and start chatting!\n"
-            partner_match_msg += "Use /next to skip or /stop to end."
+                partner_match_msg = partner_match_msg.replace("[Nickname]", user_profile.nickname)
+                partner_match_msg = partner_match_msg.replace("[Gender]", user_profile.gender)
+                partner_match_msg = partner_match_msg.replace("[Country]", user_profile.country)
+                partner_match_msg = partner_match_msg.replace("{nickname}", user_profile.nickname)
+                partner_match_msg = partner_match_msg.replace("{gender}", user_profile.gender)
+                partner_match_msg = partner_match_msg.replace("{country}", user_profile.country)
+            else:
+                # If no profile, remove placeholder lines
+                partner_match_msg = partner_match_msg.replace("👤 **Partner's Profile:**\n", "")
+                partner_match_msg = partner_match_msg.replace("📝 [Nickname]\n", "")
+                partner_match_msg = partner_match_msg.replace("👤 [Gender]\n", "")
+                partner_match_msg = partner_match_msg.replace("🌍 [Country]\n\n", "\n")
             
             await context.bot.send_message(
                 partner_id,
@@ -328,9 +381,14 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         partner_id = await matching.end_chat(user_id)
         
         if partner_id:
-            await update.message.reply_text(
+            default_chat_end = (
                 "👋 **Chat ended.**\n\n"
-                "Use /chat to find a new partner!",
+                "Use /chat to find a new partner!"
+            )
+            chat_end_msg = await get_custom_message(context, "chat_end_message", default_chat_end)
+            
+            await update.message.reply_text(
+                chat_end_msg,
                 parse_mode="Markdown",
             )
             
@@ -339,10 +397,15 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Notify partner
             try:
+                default_partner_left = (
+                    "⚠️ **Partner has left the chat.**\n\n"
+                    "Use /chat to find a new partner!"
+                )
+                partner_left_msg = await get_custom_message(context, "partner_left_message", default_partner_left)
+                
                 await context.bot.send_message(
                     partner_id,
-                    "⚠️ **Partner has left the chat.**\n\n"
-                    "Use /chat to find a new partner!",
+                    partner_left_msg,
                     parse_mode="Markdown",
                 )
                 
@@ -405,10 +468,15 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Notify previous partner
         try:
+            default_partner_skipped = (
+                "⚠️ **Partner skipped to next chat.**\n\n"
+                "Use /chat to find a new partner!"
+            )
+            partner_skipped_msg = await get_custom_message(context, "partner_left_message", default_partner_skipped)
+            
             await context.bot.send_message(
                 partner_id,
-                "⚠️ **Partner skipped to next chat.**\n\n"
-                "Use /chat to find a new partner!",
+                partner_skipped_msg,
                 parse_mode="Markdown",
             )
             
@@ -445,16 +513,32 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if activity_manager:
                 partner_status = await activity_manager.get_status_text(new_partner_id)
             
-            # Send match notification to user with partner's profile
-            match_msg = "✅ **New partner found!**\n\n"
+            # Get custom match found message template
+            default_match_template = (
+                "✅ **New partner found!**\n\n"
+                "👤 **Partner's Profile:**\n"
+                "📝 [Nickname]\n"
+                "👤 [Gender]\n"
+                "🌍 [Country]\n\n"
+                "👋 Say hi and start chatting!"
+            )
+            
+            match_msg = await get_custom_message(context, "match_found_message", default_match_template)
+            
+            # Replace profile placeholders with actual data if profile exists
             if partner_profile:
-                match_msg += f"👤 **Partner's Profile:**\n"
-                match_msg += f"📝 {partner_profile.nickname}\n"
-                match_msg += f"{'👨' if partner_profile.gender == 'Male' else '👩' if partner_profile.gender == 'Female' else '🧑'} {partner_profile.gender}\n"
-                match_msg += f"🌍 {partner_profile.country}\n"
-            if partner_status:
-                match_msg += f"📶 {partner_status}\n"
-            match_msg += "\n👋 Say hi and start chatting!"
+                match_msg = match_msg.replace("[Nickname]", partner_profile.nickname)
+                match_msg = match_msg.replace("[Gender]", partner_profile.gender)
+                match_msg = match_msg.replace("[Country]", partner_profile.country)
+                match_msg = match_msg.replace("{nickname}", partner_profile.nickname)
+                match_msg = match_msg.replace("{gender}", partner_profile.gender)
+                match_msg = match_msg.replace("{country}", partner_profile.country)
+            else:
+                # If no profile, remove placeholder lines
+                match_msg = match_msg.replace("👤 **Partner's Profile:**\n", "")
+                match_msg = match_msg.replace("📝 [Nickname]\n", "")
+                match_msg = match_msg.replace("👤 [Gender]\n", "")
+                match_msg = match_msg.replace("🌍 [Country]\n\n", "\n")
             
             await update.message.reply_text(
                 match_msg,
@@ -467,15 +551,31 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_status = await activity_manager.get_status_text(user_id)
             
             # Send match notification to partner with user's profile
-            partner_match_msg = "✅ **Partner found!**\n\n"
+            default_partner_template = (
+                "✅ **Partner found!**\n\n"
+                "👤 **Partner's Profile:**\n"
+                "📝 [Nickname]\n"
+                "👤 [Gender]\n"
+                "🌍 [Country]\n\n"
+                "👋 Say hi and start chatting!"
+            )
+            
+            partner_match_msg = await get_custom_message(context, "match_found_message", default_partner_template)
+            
+            # Replace profile placeholders with actual data if profile exists
             if user_profile:
-                partner_match_msg += f"👤 **Partner's Profile:**\n"
-                partner_match_msg += f"📝 {user_profile.nickname}\n"
-                partner_match_msg += f"{'👨' if user_profile.gender == 'Male' else '👩' if user_profile.gender == 'Female' else '🧑'} {user_profile.gender}\n"
-                partner_match_msg += f"🌍 {user_profile.country}\n"
-            if user_status:
-                partner_match_msg += f"📶 {user_status}\n"
-            partner_match_msg += "\n👋 Say hi and start chatting!"
+                partner_match_msg = partner_match_msg.replace("[Nickname]", user_profile.nickname)
+                partner_match_msg = partner_match_msg.replace("[Gender]", user_profile.gender)
+                partner_match_msg = partner_match_msg.replace("[Country]", user_profile.country)
+                partner_match_msg = partner_match_msg.replace("{nickname}", user_profile.nickname)
+                partner_match_msg = partner_match_msg.replace("{gender}", user_profile.gender)
+                partner_match_msg = partner_match_msg.replace("{country}", user_profile.country)
+            else:
+                # If no profile, remove placeholder lines
+                partner_match_msg = partner_match_msg.replace("👤 **Partner's Profile:**\n", "")
+                partner_match_msg = partner_match_msg.replace("📝 [Nickname]\n", "")
+                partner_match_msg = partner_match_msg.replace("👤 [Gender]\n", "")
+                partner_match_msg = partner_match_msg.replace("🌍 [Country]\n\n", "\n")
             
             await context.bot.send_message(
                 new_partner_id,

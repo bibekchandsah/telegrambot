@@ -135,7 +135,7 @@ Profile contains:
     - Inline menus
     - Ads (if monetizing)
 
-7. Bot Configuration 
+7. Bot Configuration ()
 - Admin must be able to modify:
     - Bot welcome message
     - Match-found message
@@ -143,14 +143,6 @@ Profile contains:
 - Rules
     - Cooldown time after /next
     - Inactivity auto-disconnect duration
-    - Allow/disallow:
-        - photos
-        - videos
-        - voice
-        - stickers
-        - location
-        - GIFs
-        - contact sharing
 - Also:
     - Maintenance mode ON/OFF
     - Disable new registrations

@@ -69,6 +69,9 @@ function loadTabData(tab) {
             loadBadWords();
             loadModerationLogs();
             break;
+        case 'bot-settings':
+            loadBotSettings();
+            break;
     }
 }
 
@@ -1364,3 +1367,187 @@ async function loadModerationLogs() {
         tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error loading logs</td></tr>';
     }
 }
+
+// ============================================
+// BOT SETTINGS & CONFIGURATION
+// ============================================
+
+// Load bot settings
+async function loadBotSettings() {
+    try {
+        const response = await fetch('/api/settings/bot');
+        const data = await response.json();
+        
+        if (data.success && data.settings) {
+            const settings = data.settings;
+            
+            // Populate message fields with current values or defaults
+            document.getElementById('welcome-message').value = settings.welcome_message || settings.default_welcome || '';
+            document.getElementById('match-found-message').value = settings.match_found_message || settings.default_match_found || '';
+            document.getElementById('chat-end-message').value = settings.chat_end_message || settings.default_chat_end || '';
+            document.getElementById('partner-left-message').value = settings.partner_left_message || settings.default_partner_left || '';
+            document.getElementById('inactivity-duration').value = settings.inactivity_duration || 300;
+            
+            // Set mode checkboxes
+            document.getElementById('maintenance-mode').checked = settings.maintenance_mode || false;
+            document.getElementById('registrations-enabled').checked = settings.registrations_enabled !== false;
+        }
+    } catch (error) {
+        console.error('Error loading bot settings:', error);
+        alert('Error loading bot settings. Please try again.');
+    }
+}
+
+// Save bot messages and inactivity duration
+async function saveBotMessages() {
+    const welcomeMessage = document.getElementById('welcome-message').value.trim();
+    const matchFoundMessage = document.getElementById('match-found-message').value.trim();
+    const chatEndMessage = document.getElementById('chat-end-message').value.trim();
+    const partnerLeftMessage = document.getElementById('partner-left-message').value.trim();
+    const inactivityDuration = parseInt(document.getElementById('inactivity-duration').value);
+    
+    if (inactivityDuration < 60) {
+        alert('Inactivity duration must be at least 60 seconds');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to update the bot messages and inactivity duration?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/settings/bot/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                welcome_message: welcomeMessage || null,
+                match_found_message: matchFoundMessage || null,
+                chat_end_message: chatEndMessage || null,
+                partner_left_message: partnerLeftMessage || null,
+                inactivity_duration: inactivityDuration,
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Bot messages and settings updated successfully!\\n\\nUpdated: ' + data.updated.join(', '));
+        } else {
+            alert('Error: ' + (data.message || 'Failed to update settings'));
+        }
+    } catch (error) {
+        console.error('Error saving bot messages:', error);
+        alert('Error saving bot messages. Please try again.');
+    }
+}
+
+// Save bot mode settings
+async function saveBotModes() {
+    const maintenanceMode = document.getElementById('maintenance-mode').checked;
+    const registrationsEnabled = document.getElementById('registrations-enabled').checked;
+    
+    if (!confirm('Are you sure you want to update the bot mode settings?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/settings/bot/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                maintenance_mode: maintenanceMode,
+                registrations_enabled: registrationsEnabled,
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Bot mode settings updated successfully!\\n\\nUpdated: ' + data.updated.join(', '));
+        } else {
+            alert('Error: ' + (data.message || 'Failed to update settings'));
+        }
+    } catch (error) {
+        console.error('Error saving bot modes:', error);
+        alert('Error saving bot modes. Please try again.');
+    }
+}
+
+// Force logout all users
+async function forceLogoutAll() {
+    if (!confirm('⚠️ WARNING: This will forcefully disconnect ALL active users and clear all chat sessions.\\n\\nAre you absolutely sure you want to do this?')) {
+        return;
+    }
+    
+    if (!confirm('This action cannot be undone. Confirm again to proceed.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/settings/actions/force-logout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            // Refresh statistics
+            loadStatistics();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to force logout users'));
+        }
+    } catch (error) {
+        console.error('Error forcing logout:', error);
+        alert('Error forcing logout. Please try again.');
+    }
+}
+
+// Reset queue
+async function resetQueue() {
+    if (!confirm('⚠️ WARNING: This will remove ALL users from the matching queue.\\n\\nAre you absolutely sure you want to do this?')) {
+        return;
+    }
+    
+    if (!confirm('This action cannot be undone. Confirm again to proceed.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/settings/actions/reset-queue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                admin_id: 'admin'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            // Refresh statistics
+            loadStatistics();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to reset queue'));
+        }
+    } catch (error) {
+        console.error('Error resetting queue:', error);
+        alert('Error resetting queue. Please try again.');
+    }
+}
+

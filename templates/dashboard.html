@@ -64,6 +64,7 @@
             <button class="tab-button" data-tab="search">Search Users</button>
             <button class="tab-button" data-tab="moderation">Moderation</button>
             <button class="tab-button" data-tab="reports">Reports & Safety</button>
+            <button class="tab-button" data-tab="bot-settings">⚙️ Bot Settings</button>
         </div>
 
         <!-- Tab Content -->
@@ -524,6 +525,101 @@
                                 <tr><td colspan="5" class="loading">Click Refresh to load logs</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bot Settings Tab -->
+            <div id="bot-settings" class="tab-pane">
+                <div class="section-header">
+                    <h2>⚙️ Bot Settings & Configuration</h2>
+                    <button class="btn btn-primary" onclick="loadBotSettings()">🔄 Refresh</button>
+                </div>
+
+                <!-- Bot Messages Configuration -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0;">💬 Bot Messages</h4>
+                    
+                    <div class="form-group">
+                        <label>Welcome Message:</label>
+                        <textarea id="welcome-message" rows="6" placeholder="Enter welcome message (leave empty for default)"></textarea>
+                        <small>Shown when users start the bot with /start</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Match Found Message:</label>
+                        <textarea id="match-found-message" rows="4" placeholder="Enter match found message (leave empty for default)"></textarea>
+                        <small>Shown when a chat partner is found</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Chat End Message (User Ends Chat):</label>
+                        <textarea id="chat-end-message" rows="4" placeholder="Enter chat end message (leave empty for default)"></textarea>
+                        <small>Shown to user when they end the chat with /stop</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Partner Left Message (Partner Leaves):</label>
+                        <textarea id="partner-left-message" rows="4" placeholder="Enter partner left message (leave empty for default)"></textarea>
+                        <small>Shown when partner leaves or skips to next chat</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Inactivity Auto-Disconnect Duration (seconds):</label>
+                        <input type="number" id="inactivity-duration" min="60" max="3600" placeholder="300" value="300">
+                        <small>Auto-disconnect after this many seconds of inactivity (minimum 60 seconds)</small>
+                    </div>
+                    
+                    <button class="btn-success" onclick="saveBotMessages()">💾 Save Messages & Duration</button>
+                </div>
+                
+                <!-- Bot Mode Controls -->
+                <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0;">🔧 Bot Mode Controls</h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="maintenance-mode" style="width: 20px; height: 20px;">
+                                <span style="font-weight: 600;">🔒 Maintenance Mode</span>
+                            </label>
+                            <small style="display: block; margin-left: 30px; margin-top: 5px;">Bot will not accept any commands</small>
+                        </div>
+                        
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="registrations-enabled" checked style="width: 20px; height: 20px;">
+                                <span style="font-weight: 600;">✅ Allow New Registrations</span>
+                            </label>
+                            <small style="display: block; margin-left: 30px; margin-top: 5px;">New users can start using the bot</small>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-success" onclick="saveBotModes()">💾 Save Mode Settings</button>
+                </div>
+                
+                <!-- Admin Actions -->
+                <div style="background: #f8d7da; padding: 20px; border-radius: 8px;">
+                    <h4 style="margin-top: 0; color: #721c24;">⚠️ Critical Admin Actions</h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <button class="btn-danger" onclick="forceLogoutAll()" style="width: 100%;">
+                                🚪 Force Logout All Users
+                            </button>
+                            <small style="display: block; margin-top: 5px; color: #721c24;">
+                                Disconnects all active chats and clears all sessions
+                            </small>
+                        </div>
+                        
+                        <div>
+                            <button class="btn-danger" onclick="resetQueue()" style="width: 100%;">
+                                🗑️ Reset Entire Queue
+                            </button>
+                            <small style="display: block; margin-top: 5px; color: #721c24;">
+                                Removes all users from the matching queue
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
