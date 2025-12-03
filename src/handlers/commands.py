@@ -182,11 +182,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             KeyboardButton("⏭️ Next"),
         ],
         [
-            KeyboardButton("⚙️ Settings"),
             KeyboardButton("👤 Profile"),
+            KeyboardButton("⚠️ Report"),
         ],
         [
-            KeyboardButton("⚠️ Report"),
             KeyboardButton("🆘 Help"),
         ],
     ]
@@ -4524,137 +4523,17 @@ async def matchstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle inline keyboard button clicks from main menu."""
+    """Handle inline keyboard button clicks from main menu (placeholder for future use)."""
     query = update.callback_query
     await query.answer()
     
-    action = query.data
-    user_id = update.effective_user.id
-    
-    # Route to appropriate command
-    if action == "action_start_chat":
-        # Simulate /chat command
-        await query.message.reply_text("🔍 Searching for a partner...")
-        # Call chat command logic
-        await chat_command(update, context)
-    
-    elif action == "action_settings":
-        # Show settings menu
-        keyboard = [
-            [InlineKeyboardButton("👤 Edit Profile", callback_data="action_edit_profile")],
-            [InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences")],
-            [InlineKeyboardButton("📁 Media Settings", callback_data="action_media")],
-            [InlineKeyboardButton("⭐ Rating", callback_data="action_rating")],
-            [InlineKeyboardButton("🔙 Back to Menu", callback_data="action_back")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "⚙️ **Settings Menu**\n\nChoose what you want to configure:",
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
-    
-    elif action == "action_edit_profile":
-        # Dismiss the settings menu and start edit profile conversation
-        await query.edit_message_text(
-            "👤 **Edit Profile**\n\nStarting profile editor...",
-            parse_mode="Markdown"
-        )
-        # Create a pseudo-update with message context for conversation handler
-        from telegram import Update as TgUpdate, Message
-        # Send new message to trigger editprofile
-        await query.message.chat.send_message("Starting profile editor...")
-        # Manually trigger the conversation by simulating command
-        context.user_data.clear()
-        await editprofile_command(
-            TgUpdate(
-                update_id=update.update_id,
-                message=query.message,
-            ),
-            context
-        )
-    
-    elif action == "action_preferences":
-        # Dismiss the settings menu and start preferences conversation
-        await query.edit_message_text(
-            "🎯 **Preferences**\n\nStarting preferences editor...",
-            parse_mode="Markdown"
-        )
-        from telegram import Update as TgUpdate
-        context.user_data.clear()
-        await preferences_command(
-            TgUpdate(
-                update_id=update.update_id,
-                message=query.message,
-            ),
-            context
-        )
-    
-    elif action == "action_media":
-        # Dismiss the settings menu and start media settings conversation
-        await query.edit_message_text(
-            "📁 **Media Settings**\n\nStarting media settings editor...",
-            parse_mode="Markdown"
-        )
-        from telegram import Update as TgUpdate
-        context.user_data.clear()
-        await mediasettings_command(
-            TgUpdate(
-                update_id=update.update_id,
-                message=query.message,
-            ),
-            context
-        )
-    
-    elif action == "action_rating":
-        # Dismiss the settings menu and show rating
-        await query.edit_message_text(
-            "⭐ **Rating**\n\nChecking your last chat...",
-            parse_mode="Markdown"
-        )
-        from telegram import Update as TgUpdate
-        await rating_command(
-            TgUpdate(
-                update_id=update.update_id,
-                message=query.message,
-            ),
-            context
-        )
-    
-    elif action == "action_help":
-        # Show help
-        await query.message.reply_text(
-            "📚 **Help & Commands**\n\n"
-            "**Main Commands:**\n"
-            "• /start - Start the bot\n"
-            "• /chat - Find a random partner\n"
-            "• /stop - End current chat\n"
-            "• /next - Skip to next partner\n\n"
-            "**Profile & Settings:**\n"
-            "• /profile - View your profile\n"
-            "• /editprofile - Edit your profile\n"
-            "• /preferences - Set matching preferences\n"
-            "• /mediasettings - Configure media types\n\n"
-            "**Other:**\n"
-            "• /rating - Rate your last chat\n"
-            "• /report - Report abuse\n"
-            "• /help - Show this help\n\n"
-            "**Quick Actions:**\n"
-            "Use the menu buttons below for quick access to common features!",
-            parse_mode="Markdown"
-        )
-    
-    elif action == "action_back":
-        # Go back to main menu
-        await query.edit_message_text(
-            "👋 **Welcome to Anonymous Chat Bot!**\n\n"
-            "Connect with random people anonymously.\n"
-            "Use the buttons below or commands to get started.\n\n"
-            "• Click **💬 Chat** to find a partner\n"
-            "• Use **⚙️ Settings** to customize your experience\n"
-            "• Check **❓ Help** for all available commands",
-            parse_mode="Markdown"
-        )
+    # This callback handler is registered but not currently used
+    # since we removed the Settings button from the keyboard.
+    # Keep it for future inline button implementations.
+    await query.message.reply_text(
+        "⚠️ This feature is currently unavailable.",
+        parse_mode="Markdown"
+    )
 
 
 

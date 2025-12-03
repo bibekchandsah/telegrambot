@@ -88,7 +88,7 @@ Connect with strangers worldwide!
 ✨ Random matching with safety controls
 💬 Text, voice, photos & videos supported
 🎯 Filter by gender & country preferences
-⭐️ Rate your conversations
+⭐️ Rate partner conversations
 🛡 Report system for safety
 
 Start chatting anonymously now!
@@ -98,4 +98,5 @@ Meet new people anonymously! MeetGrid connects you with random strangers for tex
 
 (concise)
 Anonymous random chat bot. Connect with strangers, share media, set preferences, and chat safely. Your identity stays private. Start meeting new people now! 🌐✨
+
 
