@@ -1515,8 +1515,8 @@ if __name__ == '__main__':
     asyncio.run(init_services())
     print("Services initialized successfully!")
     
-    # Run Flask app
-    port = int(Config.DASHBOARD_PORT if hasattr(Config, 'DASHBOARD_PORT') else 5000)
+    # Run Flask app - Use Railway's PORT or fallback to config
+    port = int(os.getenv('PORT', Config.DASHBOARD_PORT if hasattr(Config, 'DASHBOARD_PORT') else 5000))
     debug = Config.ENVIRONMENT == 'development'
     
     logger.info("Starting admin dashboard", port=port, debug=debug)
