@@ -4555,28 +4555,119 @@ async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     
     elif action == "action_profile":
-        # Show profile
-        await profile_command(update, context)
+        # Show profile - create a fake update with message context
+        profile_manager: ProfileManager = context.bot_data.get("profile_manager")
+        if not profile_manager:
+            await query.message.reply_text("❌ Service unavailable.")
+            return
+        
+        profile = await profile_manager.get_profile(user_id)
+        if not profile:
+            await query.message.reply_text(
+                "👤 **Your Profile**\n\n"
+                "You haven't created a profile yet.\n"
+                "Use /editprofile to create one!",
+                parse_mode="Markdown"
+            )
+        else:
+            gender_emoji = {"male": "👨", "female": "👩"}.get(profile.get("gender", ""), "👤")
+            await query.message.reply_text(
+                f"👤 **Your Profile**\n\n"
+                f"{gender_emoji} Gender: {profile.get('gender', 'Not set').title()}\n"
+                f"📝 Nickname: {profile.get('nickname', 'Not set')}\n"
+                f"🌍 Country: {profile.get('country', 'Not set')}\n\n"
+                f"Use /editprofile to update your profile.",
+                parse_mode="Markdown"
+            )
     
     elif action == "action_preferences":
         # Show preferences
-        await preferences_command(update, context)
+        preference_manager: PreferenceManager = context.bot_data.get("preference_manager")
+        if not preference_manager:
+            await query.message.reply_text("❌ Service unavailable.")
+            return
+        
+        prefs = await preference_manager.get_preferences(user_id)
+        gender_pref = prefs.get("gender", "any")
+        country_pref = prefs.get("country", "any")
+        
+        gender_text = {"male": "👨 Male only", "female": "👩 Female only", "any": "👥 Any gender"}.get(gender_pref, "👥 Any")
+        country_text = f"🌍 {country_pref}" if country_pref != "any" else "🌍 Any country"
+        
+        await query.message.reply_text(
+            f"🎯 **Your Matching Preferences**\n\n"
+            f"Gender: {gender_text}\n"
+            f"Country: {country_text}\n\n"
+            f"Use /preferences to update your preferences.",
+            parse_mode="Markdown"
+        )
     
     elif action == "action_media":
         # Show media settings
-        await mediasettings_command(update, context)
+        media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
+        if not media_manager:
+            await query.message.reply_text("❌ Service unavailable.")
+            return
+        
+        prefs = await media_manager.get_preferences(user_id)
+        text = prefs.get("text", True)
+        photo = prefs.get("photo", True)
+        video = prefs.get("video", True)
+        voice = prefs.get("voice", True)
+        
+        await query.message.reply_text(
+            f"📁 **Media Settings**\n\n"
+            f"{'✅' if text else '❌'} Text messages\n"
+            f"{'✅' if photo else '❌'} Photos\n"
+            f"{'✅' if video else '❌'} Videos\n"
+            f"{'✅' if voice else '❌'} Voice messages\n\n"
+            f"Use /mediasettings to update your media preferences.",
+            parse_mode="Markdown"
+        )
     
     elif action == "action_rating":
-        # Show rating
-        await rating_command(update, context)
+        # Show rating prompt
+        await query.message.reply_text(
+            "⭐ **Rate Your Last Chat**\n\n"
+            "Use /rating to rate your last chat partner.\n"
+            "Your feedback helps improve matching quality!",
+            parse_mode="Markdown"
+        )
     
     elif action == "action_help":
         # Show help
-        await help_command(update, context)
+        await query.message.reply_text(
+            "📚 **Help & Commands**\n\n"
+            "**Main Commands:**\n"
+            "• /start - Start the bot\n"
+            "• /chat - Find a random partner\n"
+            "• /stop - End current chat\n"
+            "• /next - Skip to next partner\n\n"
+            "**Profile & Settings:**\n"
+            "• /profile - View your profile\n"
+            "• /editprofile - Edit your profile\n"
+            "• /preferences - Set matching preferences\n"
+            "• /mediasettings - Configure media types\n\n"
+            "**Other:**\n"
+            "• /rating - Rate your last chat\n"
+            "• /report - Report abuse\n"
+            "• /help - Show this help\n\n"
+            "**Quick Actions:**\n"
+            "Use the menu buttons below for quick access to common features!",
+            parse_mode="Markdown"
+        )
     
     elif action == "action_back":
-        # Go back to main menu - resend start message
-        await start_command(update, context)
+        # Go back to main menu
+        await query.edit_message_text(
+            "👋 **Welcome to Anonymous Chat Bot!**\n\n"
+            "Connect with random people anonymously.\n"
+            "Use the buttons below or commands to get started.\n\n"
+            "• Click **💬 Chat** to find a partner\n"
+            "• Use **⚙️ Settings** to customize your experience\n"
+            "• Check **❓ Help** for all available commands",
+            parse_mode="Markdown"
+        )
 
 
 
