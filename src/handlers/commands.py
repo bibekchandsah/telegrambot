@@ -4555,20 +4555,71 @@ async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     
     elif action == "action_edit_profile":
-        # Trigger /editprofile command
-        await editprofile_command(update, context)
+        # Dismiss the settings menu and start edit profile conversation
+        await query.edit_message_text(
+            "👤 **Edit Profile**\n\nStarting profile editor...",
+            parse_mode="Markdown"
+        )
+        # Create a pseudo-update with message context for conversation handler
+        from telegram import Update as TgUpdate, Message
+        # Send new message to trigger editprofile
+        await query.message.chat.send_message("Starting profile editor...")
+        # Manually trigger the conversation by simulating command
+        context.user_data.clear()
+        await editprofile_command(
+            TgUpdate(
+                update_id=update.update_id,
+                message=query.message,
+            ),
+            context
+        )
     
     elif action == "action_preferences":
-        # Trigger /preferences command
-        await preferences_command(update, context)
+        # Dismiss the settings menu and start preferences conversation
+        await query.edit_message_text(
+            "🎯 **Preferences**\n\nStarting preferences editor...",
+            parse_mode="Markdown"
+        )
+        from telegram import Update as TgUpdate
+        context.user_data.clear()
+        await preferences_command(
+            TgUpdate(
+                update_id=update.update_id,
+                message=query.message,
+            ),
+            context
+        )
     
     elif action == "action_media":
-        # Trigger /mediasettings command
-        await mediasettings_command(update, context)
+        # Dismiss the settings menu and start media settings conversation
+        await query.edit_message_text(
+            "📁 **Media Settings**\n\nStarting media settings editor...",
+            parse_mode="Markdown"
+        )
+        from telegram import Update as TgUpdate
+        context.user_data.clear()
+        await mediasettings_command(
+            TgUpdate(
+                update_id=update.update_id,
+                message=query.message,
+            ),
+            context
+        )
     
     elif action == "action_rating":
-        # Trigger /rating command
-        await rating_command(update, context)
+        # Dismiss the settings menu and show rating
+        await query.edit_message_text(
+            "⭐ **Rating**\n\nChecking your last chat...",
+            parse_mode="Markdown"
+        )
+        from telegram import Update as TgUpdate
+        await rating_command(
+            TgUpdate(
+                update_id=update.update_id,
+                message=query.message,
+            ),
+            context
+        )
     
     elif action == "action_help":
         # Show help
