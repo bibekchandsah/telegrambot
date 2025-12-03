@@ -173,24 +173,25 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Replace {first_name} placeholder if present
     welcome_message = welcome_message.replace("{first_name}", user.first_name)
     
-    # Create inline keyboard with main actions
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    # Create persistent keyboard menu at bottom
+    from telegram import KeyboardButton, ReplyKeyboardMarkup
     
     keyboard = [
         [
-            InlineKeyboardButton("💬 Start Chat", callback_data="action_start_chat"),
-            InlineKeyboardButton("⚙️ Settings", callback_data="action_settings"),
+            KeyboardButton("💬 Chat"),
+            KeyboardButton("⚙️ Settings"),
         ],
         [
-            InlineKeyboardButton("👤 Profile", callback_data="action_profile"),
-            InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences"),
-        ],
-        [
-            InlineKeyboardButton("📊 My Rating", callback_data="action_rating"),
-            InlineKeyboardButton("❓ Help", callback_data="action_help"),
+            KeyboardButton("⚠️ Report"),
+            KeyboardButton("🆘 Help"),
         ],
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Choose an option..."
+    )
     
     await update.message.reply_text(
         welcome_message,

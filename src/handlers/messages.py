@@ -27,6 +27,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     report_manager = context.bot_data.get("report_manager")
     redis_client = context.bot_data.get("redis")
     
+    # Handle keyboard button presses
+    if update.message.text:
+        text = update.message.text.strip()
+        
+        # Import command handlers
+        from src.handlers.commands import (
+            chat_command,
+            help_command,
+            report_command,
+        )
+        
+        # Map button text to command handlers
+        if text in ["💬 Chat", "💬 Start Chat"]:
+            return await chat_command(update, context)
+        elif text in ["⚙️ Settings"]:
+            from src.handlers.commands import preferences_command, mediasettings_command
+            # Show settings menu
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [
+                [InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences")],
+                [InlineKeyboardButton("📸 Media Settings", callback_data="action_media")],
+                [InlineKeyboardButton("👤 Profile", callback_data="action_profile")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "⚙️ **Settings Menu**\n\nChoose what you want to configure:",
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+            return
+        elif text in ["⚠️ Report"]:
+            return await report_command(update, context)
+        elif text in ["🆘 Help", "❓ Help"]:
+            return await help_command(update, context)
+    
     # Check maintenance mode (admins can still send messages)
     if redis_client:
         try:
