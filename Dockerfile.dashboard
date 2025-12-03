@@ -1,0 +1,25 @@
+# Dockerfile for Admin Dashboard
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY src/ ./src/
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY admin_dashboard.py .
+
+# Set environment for production
+ENV PYTHONUNBUFFERED=1
+ENV ENVIRONMENT=production
+ENV FLASK_ENV=production
+
+# Expose port for dashboard
+EXPOSE 5000
+
+# Run the dashboard
+CMD ["python", "-u", "admin_dashboard.py"]
