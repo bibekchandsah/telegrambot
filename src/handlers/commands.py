@@ -179,7 +179,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             KeyboardButton("💬 Chat"),
+            KeyboardButton("⏭️ Next"),
+        ],
+        [
             KeyboardButton("⚙️ Settings"),
+            KeyboardButton("👤 Profile"),
         ],
         [
             KeyboardButton("⚠️ Report"),
@@ -4540,6 +4544,7 @@ async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             [InlineKeyboardButton("👤 Edit Profile", callback_data="action_profile")],
             [InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences")],
             [InlineKeyboardButton("📁 Media Settings", callback_data="action_media")],
+            [InlineKeyboardButton("⭐ Rating", callback_data="action_rating")],
             [InlineKeyboardButton("🔙 Back to Menu", callback_data="action_back")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
