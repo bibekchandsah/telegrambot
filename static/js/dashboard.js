@@ -72,6 +72,9 @@ function loadTabData(tab) {
         case 'bot-settings':
             loadBotSettings();
             break;
+        case 'matching-control':
+            loadMatchingSettings();
+            break;
     }
 }
 
@@ -1550,4 +1553,140 @@ async function resetQueue() {
         alert('Error resetting queue. Please try again.');
     }
 }
+
+// ============================================
+// MATCHING CONTROL FUNCTIONS
+// ============================================
+
+async function loadMatchingSettings() {
+    try {
+        const response = await fetch('/api/matching/settings');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update toggles
+            document.getElementById('gender-filter-enabled').checked = data.settings.gender_filter_enabled;
+            document.getElementById('regional-filter-enabled').checked = data.settings.regional_filter_enabled;
+            
+            // Load queue size
+            await loadQueueSize();
+        } else {
+            console.error('Failed to load matching settings:', data.error);
+        }
+    } catch (error) {
+        console.error('Error loading matching settings:', error);
+    }
+}
+
+async function updateMatchingFilters() {
+    const genderEnabled = document.getElementById('gender-filter-enabled').checked;
+    const regionalEnabled = document.getElementById('regional-filter-enabled').checked;
+    
+    try {
+        const response = await fetch('/api/matching/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                admin_id: 'admin',
+                gender_filter_enabled: genderEnabled,
+                regional_filter_enabled: regionalEnabled
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('✅ Matching settings updated successfully', 'success');
+        } else {
+            alert('Error: ' + (data.message || 'Failed to update settings'));
+            // Reload settings to revert UI
+            loadMatchingSettings();
+        }
+    } catch (error) {
+        console.error('Error updating matching filters:', error);
+        alert('Error updating settings. Please try again.');
+        loadMatchingSettings();
+    }
+}
+
+async function loadQueueSize() {
+    try {
+        const response = await fetch('/api/matching/queue-size');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('queue-size-display').textContent = data.queue_size;
+            
+            // Update timestamp
+            const timestamp = new Date(data.timestamp);
+            document.getElementById('queue-last-updated').textContent = timestamp.toLocaleTimeString();
+        } else {
+            document.getElementById('queue-size-display').textContent = 'Error';
+            document.getElementById('queue-last-updated').textContent = '-';
+        }
+    } catch (error) {
+        console.error('Error loading queue size:', error);
+        document.getElementById('queue-size-display').textContent = 'Error';
+        document.getElementById('queue-last-updated').textContent = '-';
+    }
+}
+
+async function forceMatchUsers() {
+    const user1 = document.getElementById('force-match-user1').value;
+    const user2 = document.getElementById('force-match-user2').value;
+    
+    if (!user1 || !user2) {
+        alert('Please enter both user IDs');
+        return;
+    }
+    
+    if (user1 === user2) {
+        alert('Cannot match a user with themselves');
+        return;
+    }
+    
+    if (!confirm(`⚠️ WARNING: Force Match (Debug Feature)\\n\\nThis will forcefully match:\\nUser ${user1} ←→ User ${user2}\\n\\nThis bypasses all filters and queue logic.\\nAre you sure?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/matching/force-match', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                admin_id: 'admin',
+                user1_id: parseInt(user1),
+                user2_id: parseInt(user2)
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            // Clear inputs
+            document.getElementById('force-match-user1').value = '';
+            document.getElementById('force-match-user2').value = '';
+            // Refresh statistics
+            loadStats();
+            loadQueueSize();
+        } else {
+            alert('Error: ' + (data.error || data.message || 'Failed to force match'));
+        }
+    } catch (error) {
+        console.error('Error forcing match:', error);
+        alert('Error forcing match. Please try again.');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    // Simple notification - you can enhance this with better UI
+    const alertClass = type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info';
+    console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
 

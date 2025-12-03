@@ -64,6 +64,7 @@
             <button class="tab-button" data-tab="search">Search Users</button>
             <button class="tab-button" data-tab="moderation">Moderation</button>
             <button class="tab-button" data-tab="reports">Reports & Safety</button>
+            <button class="tab-button" data-tab="matching-control">🎯 Matching Control</button>
             <button class="tab-button" data-tab="bot-settings">⚙️ Bot Settings</button>
         </div>
 
@@ -526,6 +527,85 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            <!-- Matching Control Tab -->
+            <div id="matching-control" class="tab-pane">
+                <div class="section-header">
+                    <h2>🎯 Matching Control</h2>
+                    <button class="btn btn-primary" onclick="loadMatchingSettings()">🔄 Refresh</button>
+                </div>
+
+                <!-- Matching Filters Section -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0;">🔧 Matching Filters</h4>
+                    <p style="color: #666; margin-bottom: 15px;">Control how users are matched with each other</p>
+                    
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="gender-filter-enabled" onchange="updateMatchingFilters()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>👫 Gender Filter</span>
+                        </label>
+                        <small style="display: block; margin-top: 5px;">When enabled, users are matched based on their gender preferences</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="regional-filter-enabled" onchange="updateMatchingFilters()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>🌍 Regional Filter</span>
+                        </label>
+                        <small style="display: block; margin-top: 5px;">When enabled, users are matched with others from the same country</small>
+                    </div>
+                </div>
+
+                <!-- Queue Information Section -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0;">📊 Queue Statistics</h4>
+                    
+                    <div class="stat-row">
+                        <div class="stat-item">
+                            <div class="stat-label">Current Queue Size:</div>
+                            <div class="stat-value-large" id="queue-size-display">-</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Last Updated:</div>
+                            <div class="stat-value-large" id="queue-last-updated">-</div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-secondary" onclick="loadQueueSize()" style="margin-top: 15px;">
+                        🔄 Refresh Queue Size
+                    </button>
+                </div>
+
+                <!-- Force Match Section -->
+                <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border: 2px solid #ffc107;">
+                    <h4 style="margin-top: 0;">⚠️ Force Match (Debug)</h4>
+                    <p style="color: #856404; margin-bottom: 15px;">
+                        <strong>Warning:</strong> This will forcefully match two specific users, bypassing all filters and queue logic. 
+                        Use only for debugging purposes.
+                    </p>
+                    
+                    <div class="form-group">
+                        <label>User ID 1:</label>
+                        <input type="number" id="force-match-user1" placeholder="Enter first user ID" min="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>User ID 2:</label>
+                        <input type="number" id="force-match-user2" placeholder="Enter second user ID" min="1">
+                    </div>
+                    
+                    <button class="btn btn-danger" onclick="forceMatchUsers()">
+                        ⚡ Force Match Users
+                    </button>
                 </div>
             </div>
 

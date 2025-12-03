@@ -94,12 +94,11 @@ Profile contains:
         - Fake reports
         - Harassment
 
-3. Matching Control (optional)
+3. Matching Control (implemented)
 - Admin should control:
-    - Turn matching on/off
     - Enable/disable gender filter
     - Enable/disable regional filter
-    - Clear/get current queue size
+    - get current queue size
     - Force match two specific users (debug)
 
 4. Live Monitoring (partially implemented)

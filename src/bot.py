@@ -48,6 +48,16 @@ from src.handlers.commands import (
     broadcastactive_command,
     broadcast_message_step,
     broadcast_callback,
+    broadcastusers_command,
+    broadcastusers_ids_step,
+    broadcastfilter_command,
+    filter_gender_callback,
+    filter_country_step,
+    filter_message_type_callback,
+    filter_message_step,
+    filtered_broadcast_callback,
+    button_config_callback,
+    broadcast_button_callback,
     stats_command,
     cancel_broadcast,
     ban_command,
@@ -73,6 +83,12 @@ from src.handlers.commands import (
     registrations_command,
     forcelogout_command,
     resetqueue_command,
+    enablegender_command,
+    disablegender_command,
+    enableregional_command,
+    disableregional_command,
+    forcematch_command,
+    matchstatus_command,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -80,6 +96,10 @@ from src.handlers.commands import (
     PREF_COUNTRY,
     MEDIA_SETTINGS,
     BROADCAST_MESSAGE,
+    BROADCAST_FILTER_GENDER,
+    BROADCAST_FILTER_COUNTRY,
+    BROADCAST_FILTER_MESSAGE,
+    BROADCAST_FILTER_MEDIA,
     BAN_USER_ID,
     BAN_REASON,
     BAN_DURATION,
@@ -406,6 +426,12 @@ def main():
         application.add_handler(CommandHandler("registrations", registrations_command))
         application.add_handler(CommandHandler("forcelogout", forcelogout_command))
         application.add_handler(CommandHandler("resetqueue", resetqueue_command))
+        application.add_handler(CommandHandler("enablegender", enablegender_command))
+        application.add_handler(CommandHandler("disablegender", disablegender_command))
+        application.add_handler(CommandHandler("enableregional", enableregional_command))
+        application.add_handler(CommandHandler("disableregional", disableregional_command))
+        application.add_handler(CommandHandler("forcematch", forcematch_command))
+        application.add_handler(CommandHandler("matchstatus", matchstatus_command))
         
         # Register feedback callback handler
         application.add_handler(
@@ -420,6 +446,14 @@ def main():
             CallbackQueryHandler(
                 report_callback,
                 pattern="^report_(nudity|harassment|spam|scam|fake|other|cancel)$",
+            )
+        )
+        
+        # Register broadcast button callback handler
+        application.add_handler(
+            CallbackQueryHandler(
+                broadcast_button_callback,
+                pattern="^broadcast_btn_",
             )
         )
         
@@ -456,6 +490,80 @@ def main():
             fallbacks=[CommandHandler("cancel", cancel_broadcast)],
         )
         application.add_handler(broadcast_conv_handler)
+        
+        # Register targeted users broadcast conversation handler
+        broadcastusers_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler("broadcastusers", broadcastusers_command),
+            ],
+            states={
+                BROADCAST_MESSAGE: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, broadcastusers_ids_step),
+                ],
+                BROADCAST_FILTER_MEDIA: [
+                    CallbackQueryHandler(
+                        filter_message_type_callback,
+                        pattern="^msgtype_",
+                    ),
+                ],
+                BROADCAST_FILTER_MESSAGE: [
+                    MessageHandler(
+                        (filters.TEXT | filters.PHOTO) & ~filters.COMMAND,
+                        filter_message_step,
+                    ),
+                    CallbackQueryHandler(
+                        button_config_callback,
+                        pattern="^(add_button|buttons_done)$",
+                    ),
+                    CallbackQueryHandler(
+                        filtered_broadcast_callback,
+                        pattern="^broadcast_(filtered_confirm|cancel)$",
+                    ),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_broadcast)],
+        )
+        application.add_handler(broadcastusers_conv_handler)
+        
+        # Register filtered broadcast conversation handler
+        filtered_broadcast_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler("broadcastfilter", broadcastfilter_command),
+            ],
+            states={
+                BROADCAST_FILTER_GENDER: [
+                    CallbackQueryHandler(
+                        filter_gender_callback,
+                        pattern="^filter_gender_",
+                    ),
+                ],
+                BROADCAST_FILTER_COUNTRY: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, filter_country_step),
+                ],
+                BROADCAST_FILTER_MEDIA: [
+                    CallbackQueryHandler(
+                        filter_message_type_callback,
+                        pattern="^msgtype_",
+                    ),
+                ],
+                BROADCAST_FILTER_MESSAGE: [
+                    MessageHandler(
+                        (filters.TEXT | filters.PHOTO) & ~filters.COMMAND,
+                        filter_message_step,
+                    ),
+                    CallbackQueryHandler(
+                        button_config_callback,
+                        pattern="^(add_button|buttons_done)$",
+                    ),
+                    CallbackQueryHandler(
+                        filtered_broadcast_callback,
+                        pattern="^broadcast_(filtered_confirm|cancel)$",
+                    ),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_broadcast)],
+        )
+        application.add_handler(filtered_broadcast_conv_handler)
         
         # Register ban conversation handler
         ban_conv_handler = ConversationHandler(

@@ -1293,6 +1293,216 @@ def reset_queue():
         return jsonify({"error": str(e)}), 500
 
 
+# ============================================
+# MATCHING CONTROL ENDPOINTS
+# ============================================
+
+@app.route('/api/matching/settings', methods=['GET'])
+def get_matching_settings():
+    """Get current matching filter settings."""
+    try:
+        redis_client, _, _, _, _ = get_thread_services()
+        
+        # Get filter settings (default to enabled)
+        gender_filter = run_async(redis_client.get("matching:gender_filter_enabled"))
+        regional_filter = run_async(redis_client.get("matching:regional_filter_enabled"))
+        
+        gender_enabled = True  # Default
+        regional_enabled = True  # Default
+        
+        if gender_filter is not None:
+            gender_enabled = bool(int(gender_filter.decode('utf-8') if isinstance(gender_filter, bytes) else gender_filter))
+        
+        if regional_filter is not None:
+            regional_enabled = bool(int(regional_filter.decode('utf-8') if isinstance(regional_filter, bytes) else regional_filter))
+        
+        return jsonify({
+            "success": True,
+            "settings": {
+                "gender_filter_enabled": gender_enabled,
+                "regional_filter_enabled": regional_enabled
+            }
+        })
+    except Exception as e:
+        logger.error("get_matching_settings_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/matching/settings', methods=['POST'])
+def update_matching_settings():
+    """Update matching filter settings."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _ = get_thread_services()
+        
+        updates = []
+        
+        # Update gender filter
+        if 'gender_filter_enabled' in data:
+            enabled = 1 if data['gender_filter_enabled'] else 0
+            run_async(redis_client.set("matching:gender_filter_enabled", enabled))
+            updates.append(f"gender filter ({'enabled' if enabled else 'disabled'})")
+        
+        # Update regional filter
+        if 'regional_filter_enabled' in data:
+            enabled = 1 if data['regional_filter_enabled'] else 0
+            run_async(redis_client.set("matching:regional_filter_enabled", enabled))
+            updates.append(f"regional filter ({'enabled' if enabled else 'disabled'})")
+        
+        # Log the changes
+        if report_manager and updates:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="matching_settings_updated",
+                details=f"Updated: {', '.join(updates)}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": "Matching settings updated successfully",
+            "updated": updates
+        })
+    except Exception as e:
+        logger.error("update_matching_settings_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/matching/queue-size', methods=['GET'])
+def get_queue_size():
+    """Get current queue size."""
+    try:
+        redis_client, _, _, _, _ = get_thread_services()
+        
+        # Get queue list length
+        queue_size = run_async(redis_client.llen("queue:waiting"))
+        
+        return jsonify({
+            "success": True,
+            "queue_size": queue_size,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        logger.error("get_queue_size_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/matching/force-match', methods=['POST'])
+def force_match_users():
+    """Force match two specific users (debug feature)."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        user1_id = int(data.get('user1_id'))
+        user2_id = int(data.get('user2_id'))
+        
+        if user1_id == user2_id:
+            return jsonify({"error": "Cannot match a user with themselves"}), 400
+        
+        redis_client, _, _, report_manager, _ = get_thread_services()
+        
+        # Check if users exist and their states
+        user1_state = run_async(redis_client.get(f"state:{user1_id}"))
+        user2_state = run_async(redis_client.get(f"state:{user2_id}"))
+        
+        if not user1_state:
+            return jsonify({"error": f"User {user1_id} not found or has no state"}), 400
+        if not user2_state:
+            return jsonify({"error": f"User {user2_id} not found or has no state"}), 400
+        
+        user1_state = user1_state.decode('utf-8') if isinstance(user1_state, bytes) else user1_state
+        user2_state = user2_state.decode('utf-8') if isinstance(user2_state, bytes) else user2_state
+        
+        # Check if users are already in chat
+        user1_partner = run_async(redis_client.get(f"pair:{user1_id}"))
+        user2_partner = run_async(redis_client.get(f"pair:{user2_id}"))
+        
+        if user1_partner:
+            return jsonify({"error": f"User {user1_id} is already in a chat"}), 400
+        if user2_partner:
+            return jsonify({"error": f"User {user2_id} is already in a chat"}), 400
+        
+        # Force the match
+        run_async(redis_client.set(f"pair:{user1_id}", str(user2_id)))
+        run_async(redis_client.set(f"pair:{user2_id}", str(user1_id)))
+        
+        # Update states to IN_CHAT
+        run_async(redis_client.set(f"state:{user1_id}", "IN_CHAT"))
+        run_async(redis_client.set(f"state:{user2_id}", "IN_CHAT"))
+        
+        # Remove from queue if present
+        run_async(redis_client.lrem("queue:waiting", 0, str(user1_id)))
+        run_async(redis_client.lrem("queue:waiting", 0, str(user2_id)))
+        
+        # Initialize activity timestamps
+        timestamp = datetime.utcnow().isoformat()
+        run_async(redis_client.set(f"chat:activity:{user1_id}", timestamp))
+        run_async(redis_client.set(f"chat:activity:{user2_id}", timestamp))
+        
+        # Send special notifications to both users
+        try:
+            bot = Bot(token=bot_token)
+            
+            # Special message with emojis to make users feel special
+            special_message = (
+                "✨ 🎉 <b>Special Match Found!</b> 🎉 ✨\n\n"
+                "You've been specially matched with someone amazing! "
+                "This is a unique connection just for you. \n\n"
+                "💬 Start chatting now and enjoy your conversation! 💫\n\n"
+                "<i>Use /next to find a new partner or /stop to end the chat.</i>"
+            )
+            
+            # Send to both users asynchronously
+            run_async(bot.send_message(
+                chat_id=user1_id,
+                text=special_message,
+                parse_mode='HTML'
+            ))
+            run_async(bot.send_message(
+                chat_id=user2_id,
+                text=special_message,
+                parse_mode='HTML'
+            ))
+            
+            logger.info(
+                "force_match_notifications_sent",
+                user1_id=user1_id,
+                user2_id=user2_id
+            )
+        except Exception as notify_error:
+            logger.error(
+                "force_match_notification_error",
+                error=str(notify_error),
+                user1_id=user1_id,
+                user2_id=user2_id
+            )
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="force_match",
+                details=f"Forced match between users {user1_id} and {user2_id}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Successfully forced match between users {user1_id} and {user2_id}",
+            "details": {
+                "user1_id": user1_id,
+                "user1_previous_state": user1_state,
+                "user2_id": user2_id,
+                "user2_previous_state": user2_state
+            }
+        })
+    except ValueError as ve:
+        return jsonify({"error": "Invalid user ID format"}), 400
+    except Exception as e:
+        logger.error("force_match_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/health')
 def health():
     """Health check endpoint."""

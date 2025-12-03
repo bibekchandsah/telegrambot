@@ -13,6 +13,8 @@
 /admin
 /broadcast
 /broadcastactive
+/broadcastfilter 
+/broadcastusers
 /stats
 /ban
 /unban
@@ -44,16 +46,8 @@ Examples:
 /forcelogout
 /resetqueue
 
-
-3
-6
-broadcast message Users with specific preferences (e.g., gender M, country India)
-- Message types:
-    - Text
-    - Photo
-    - Buttons
-    - Inline menus
-    - Ads (if monetizing)
-
-- /matchstatus
-    - /queue
+/enablegender
+/disablegender
+/enableregional
+/disableregional
+/forcematch

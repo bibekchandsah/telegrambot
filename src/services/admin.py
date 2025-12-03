@@ -1,4 +1,5 @@
 """Admin management for broadcast messages."""
+import json
 from typing import List, Optional, Dict
 from src.db.redis_client import RedisClient
 from src.utils.logger import get_logger
@@ -884,4 +885,81 @@ class AdminManager:
             return user_ids
         except Exception as e:
             logger.error("get_warning_list_error", error=str(e))
+            return []
+    
+    async def get_users_by_filters(
+        self, 
+        gender: Optional[str] = None, 
+        country: Optional[str] = None
+    ) -> List[int]:
+        """
+        Get list of users matching specific profile filters.
+        
+        Args:
+            gender: Filter by gender (Male/Female/Other) - None means any
+            country: Filter by country name - None means any
+            
+        Returns:
+            List of user IDs matching the filters
+        """
+        try:
+            matching_users = []
+            
+            # Scan all profile keys
+            pattern = "profile:*"
+            cursor = 0
+            
+            while True:
+                cursor, partial_keys = await self.redis.scan(
+                    cursor=cursor,
+                    match=pattern,
+                    count=100,
+                )
+                
+                for key in partial_keys:
+                    try:
+                        if isinstance(key, bytes):
+                            key = key.decode('utf-8')
+                        
+                        # Get the profile data
+                        profile_data = await self.redis.get(key)
+                        if not profile_data:
+                            continue
+                        
+                        if isinstance(profile_data, bytes):
+                            profile_data = profile_data.decode('utf-8')
+                        
+                        profile_dict = json.loads(profile_data)
+                        user_id = profile_dict.get("user_id")
+                        
+                        # Apply filters
+                        gender_match = gender is None or profile_dict.get("gender") == gender
+                        country_match = country is None or profile_dict.get("country", "").lower() == country.lower()
+                        
+                        if gender_match and country_match:
+                            matching_users.append(user_id)
+                            
+                    except (IndexError, ValueError, json.JSONDecodeError) as e:
+                        logger.debug("parse_profile_error", key=key, error=str(e))
+                        continue
+                
+                if cursor == 0:
+                    break
+            
+            logger.info(
+                "filtered_users_retrieved",
+                count=len(matching_users),
+                gender_filter=gender,
+                country_filter=country
+            )
+            
+            return matching_users
+            
+        except Exception as e:
+            logger.error(
+                "get_users_by_filters_error",
+                gender=gender,
+                country=country,
+                error=str(e)
+            )
             return []

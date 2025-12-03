@@ -225,25 +225,33 @@ class MatchingEngine:
         if not user_preferences or not partner_preferences:
             return True
         
+        # Check if gender filter is enabled globally
+        gender_filter_enabled = await self.redis.get("matching:gender_filter_enabled")
+        gender_filter_enabled = gender_filter_enabled is None or gender_filter_enabled == "1"
+        
+        # Check if regional filter is enabled globally
+        regional_filter_enabled = await self.redis.get("matching:regional_filter_enabled")
+        regional_filter_enabled = regional_filter_enabled is None or regional_filter_enabled == "1"
+        
         # Check if user's preferences match partner's profile
-        # Gender filter
-        if user_preferences.gender_filter != "Any":
+        # Gender filter (only if enabled globally)
+        if gender_filter_enabled and user_preferences.gender_filter != "Any":
             if partner_profile.gender != user_preferences.gender_filter:
                 return False
         
-        # Country filter
-        if user_preferences.country_filter != "Any":
+        # Country filter (only if enabled globally)
+        if regional_filter_enabled and user_preferences.country_filter != "Any":
             if partner_profile.country != user_preferences.country_filter:
                 return False
         
         # Check if partner's preferences match user's profile
-        # Gender filter
-        if partner_preferences.gender_filter != "Any":
+        # Gender filter (only if enabled globally)
+        if gender_filter_enabled and partner_preferences.gender_filter != "Any":
             if user_profile.gender != partner_preferences.gender_filter:
                 return False
         
-        # Country filter
-        if partner_preferences.country_filter != "Any":
+        # Country filter (only if enabled globally)
+        if regional_filter_enabled and partner_preferences.country_filter != "Any":
             if user_profile.country != partner_preferences.country_filter:
                 return False
         

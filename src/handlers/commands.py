@@ -43,6 +43,7 @@ MEDIA_SETTINGS = 5
 
 # Conversation states for admin broadcast
 BROADCAST_MESSAGE = 6
+BROADCAST_FILTER_GENDER, BROADCAST_FILTER_COUNTRY, BROADCAST_FILTER_MESSAGE, BROADCAST_FILTER_MEDIA = range(13, 17)
 
 # Conversation states for ban system
 BAN_USER_ID, BAN_REASON, BAN_DURATION = range(7, 10)
@@ -1977,9 +1978,19 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "**Critical Actions:**\n"
         "/forcelogout confirm - Disconnect all users\n"
         "/resetqueue confirm - Clear matching queue\n\n"
+        "**Matching Control Commands:**\n"
+        "/enablegender - Enable gender-based matching\n"
+        "/disablegender - Disable gender-based matching\n"
+        "/enableregional - Enable country-based matching\n"
+        "/disableregional - Disable country-based matching\n"
+        "/forcematch <id1> <id2> - Force match two users\n"
+        "/matchstatus - View matching system status\n\n"
         "**Broadcast Commands:**\n"
         "/broadcast - Send message to all users\n"
-        "/broadcastactive - Send to active users only\n\n"
+        "/broadcastactive - Send to active users only\n"
+        "/broadcastfilter - Send to users by filters\n"
+        "/broadcastusers - Send to specific user IDs\n"
+        "  (Supports: text, photos, buttons)\n\n"
         "**Ban/Moderation Commands:**\n"
         "/ban - Ban a user (temporary/permanent)\n"
         "/unban - Unban a user\n"
@@ -2226,6 +2237,614 @@ async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text("❌ Broadcast cancelled.")
     return ConversationHandler.END
+
+
+# ============================================
+# TARGETED USER BROADCAST COMMANDS
+# ============================================
+
+async def broadcastusers_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /broadcastusers command - broadcast to specific user IDs."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    # Initialize broadcast type
+    context.user_data["broadcast_type"] = "targeted_users"
+    
+    await update.message.reply_text(
+        "🎯 **Targeted User Broadcast**\n\n"
+        "Send the user IDs you want to target.\n"
+        "You can send:\n"
+        "• Single ID: `123456789`\n"
+        "• Multiple IDs: `123456789, 987654321, 456789123`\n"
+        "• One ID per line\n\n"
+        "Use /cancel to abort.",
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_MESSAGE
+
+
+async def broadcastusers_ids_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle user IDs input for targeted broadcast."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    ids_text = update.message.text.strip()
+    
+    # Parse user IDs from input
+    user_ids = []
+    invalid_ids = []
+    
+    # Split by comma or newline
+    raw_ids = ids_text.replace(',', '\n').split('\n')
+    
+    for raw_id in raw_ids:
+        raw_id = raw_id.strip()
+        if not raw_id:
+            continue
+        try:
+            uid = int(raw_id)
+            user_ids.append(uid)
+        except ValueError:
+            invalid_ids.append(raw_id)
+    
+    if invalid_ids:
+        await update.message.reply_text(
+            f"⚠️ **Invalid IDs detected:**\n{', '.join(invalid_ids)}\n\n"
+            f"Please send only numeric user IDs.",
+            parse_mode="Markdown",
+        )
+        return BROADCAST_MESSAGE
+    
+    if not user_ids:
+        await update.message.reply_text(
+            "❌ No valid user IDs provided.\nPlease try again or /cancel.",
+            parse_mode="Markdown",
+        )
+        return BROADCAST_MESSAGE
+    
+    # Store user IDs
+    context.user_data["target_user_ids"] = user_ids
+    
+    # Ask for message type
+    keyboard = [
+        [InlineKeyboardButton("📝 Text Message", callback_data="msgtype_text")],
+        [InlineKeyboardButton("📷 Photo with Caption", callback_data="msgtype_photo")],
+        [InlineKeyboardButton("🔘 Message with Buttons", callback_data="msgtype_buttons")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"✅ **Target Users:** {len(user_ids)} user(s)\n"
+        f"IDs: {', '.join(map(str, user_ids[:5]))}{' ...' if len(user_ids) > 5 else ''}\n\n"
+        f"**Select message type:**",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_FILTER_MEDIA
+
+
+# ============================================
+# FILTERED BROADCAST COMMANDS
+# ============================================
+
+async def broadcastfilter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /broadcastfilter command - broadcast to users with specific filters."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return ConversationHandler.END
+    
+    # Initialize filter data
+    context.user_data["broadcast_type"] = "filtered"
+    context.user_data["filters"] = {}
+    
+    # Ask for gender filter
+    keyboard = [
+        [
+            InlineKeyboardButton("👨 Male", callback_data="filter_gender_Male"),
+            InlineKeyboardButton("👩 Female", callback_data="filter_gender_Female"),
+        ],
+        [
+            InlineKeyboardButton("🧑 Other", callback_data="filter_gender_Other"),
+            InlineKeyboardButton("➡️ Skip (All)", callback_data="filter_gender_all"),
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "🎯 **Targeted Broadcast Setup**\n\n"
+        "**Step 1/2:** Select target gender\n"
+        "Choose a gender filter or skip to target all genders.\n\n"
+        "Use /cancel to abort.",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_FILTER_GENDER
+
+
+async def filter_gender_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle gender filter selection."""
+    query = update.callback_query
+    await query.answer()
+    
+    gender = query.data.replace("filter_gender_", "")
+    
+    if gender != "all":
+        context.user_data["filters"]["gender"] = gender
+        gender_text = f"**{gender}**"
+    else:
+        gender_text = "**All genders**"
+    
+    # Ask for country filter
+    await query.edit_message_text(
+        f"🎯 **Targeted Broadcast Setup**\n\n"
+        f"Gender filter: {gender_text}\n\n"
+        f"**Step 2/2:** Enter target country\n"
+        f"Type the country name (e.g., India, USA)\n"
+        f"or type 'all' to skip this filter.\n\n"
+        f"Use /cancel to abort.",
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_FILTER_COUNTRY
+
+
+async def filter_country_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle country filter input."""
+    country = update.message.text.strip()
+    
+    if country.lower() != "all":
+        context.user_data["filters"]["country"] = country
+    
+    # Show filter summary and ask for message type
+    filters = context.user_data.get("filters", {})
+    gender_filter = filters.get("gender", "All")
+    country_filter = filters.get("country", "All")
+    
+    keyboard = [
+        [InlineKeyboardButton("📝 Text Message", callback_data="msgtype_text")],
+        [InlineKeyboardButton("📷 Photo with Caption", callback_data="msgtype_photo")],
+        [InlineKeyboardButton("🔘 Message with Buttons", callback_data="msgtype_buttons")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"🎯 **Filter Summary**\n\n"
+        f"👤 Gender: {gender_filter}\n"
+        f"🌍 Country: {country_filter}\n\n"
+        f"**Select message type:**",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_FILTER_MEDIA
+
+
+async def filter_message_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle message type selection."""
+    query = update.callback_query
+    await query.answer()
+    
+    message_type = query.data.replace("msgtype_", "")
+    context.user_data["message_type"] = message_type
+    
+    if message_type == "text":
+        await query.edit_message_text(
+            "📝 **Send your text message**\n\n"
+            "Type the message you want to broadcast.\n"
+            "You can use Markdown formatting.\n\n"
+            "Use /cancel to abort.",
+            parse_mode="Markdown",
+        )
+    elif message_type == "photo":
+        await query.edit_message_text(
+            "📷 **Send your photo**\n\n"
+            "Send a photo with an optional caption.\n"
+            "The caption supports Markdown formatting.\n\n"
+            "Use /cancel to abort.",
+            parse_mode="Markdown",
+        )
+    elif message_type == "buttons":
+        await query.edit_message_text(
+            "🔘 **Send your message with buttons**\n\n"
+            "First, send your text message.\n"
+            "Then you'll be able to add buttons.\n\n"
+            "Use /cancel to abort.",
+            parse_mode="Markdown",
+        )
+    
+    return BROADCAST_FILTER_MESSAGE
+
+
+async def filter_message_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle broadcast message input for filtered broadcast."""
+    # Check if we're waiting for button input
+    if context.user_data.get("awaiting_button"):
+        return await handle_button_input(update, context)
+    
+    message_type = context.user_data.get("message_type", "text")
+    
+    if message_type == "photo":
+        if update.message.photo:
+            # Store photo file_id and caption
+            context.user_data["photo_file_id"] = update.message.photo[-1].file_id
+            context.user_data["broadcast_message"] = update.message.caption or ""
+        else:
+            await update.message.reply_text(
+                "❌ Please send a photo. Use /cancel to abort."
+            )
+            return BROADCAST_FILTER_MESSAGE
+    else:
+        # Store text message
+        context.user_data["broadcast_message"] = update.message.text
+    
+    # If buttons type, ask for button configuration
+    if message_type == "buttons" and "button_config_done" not in context.user_data:
+        # Initialize buttons list if not exists
+        if "broadcast_buttons" not in context.user_data:
+            context.user_data["broadcast_buttons"] = []
+        
+        buttons = context.user_data.get("broadcast_buttons", [])
+        button_list = "\n".join([f"{i+1}. {btn['text']}" for i, btn in enumerate(buttons)]) if buttons else "No buttons added yet"
+        
+        keyboard = [
+            [InlineKeyboardButton("➕ Add Button", callback_data="add_button")],
+            [InlineKeyboardButton("✅ Done, Send Broadcast", callback_data="buttons_done")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            f"🔘 **Button Configuration**\n\n"
+            f"Current buttons:\n{button_list}\n\n"
+            f"Add buttons to your message or proceed to send.",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        return BROADCAST_FILTER_MESSAGE
+    
+    # Show confirmation
+    await show_filtered_broadcast_confirmation(update, context)
+    return BROADCAST_FILTER_MESSAGE
+
+
+async def button_config_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle button configuration callbacks."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "add_button":
+        await query.edit_message_text(
+            "🔘 **Add Button**\n\n"
+            "Send the button configuration in this format:\n"
+            "`Button Text | https://example.com`\n\n"
+            "Or just button text for a callback button:\n"
+            "`Button Text`\n\n"
+            "Use /cancel to abort.",
+            parse_mode="Markdown",
+        )
+        context.user_data["awaiting_button"] = True
+        return BROADCAST_FILTER_MESSAGE
+    
+    elif query.data == "buttons_done":
+        context.user_data["button_config_done"] = True
+        await query.message.delete()
+        # Show confirmation with buttons
+        message = context.user_data.get("broadcast_message", "")
+        if message:
+            # Pass the full Update object for show_filtered_broadcast_confirmation
+            await show_filtered_broadcast_confirmation(update, context)
+        return BROADCAST_FILTER_MESSAGE
+
+
+async def handle_button_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle button input during configuration."""
+    button_config = update.message.text.strip()
+    
+    if "|" in button_config:
+        # URL button
+        parts = button_config.split("|", 1)
+        text = parts[0].strip()
+        url = parts[1].strip()
+        
+        if not context.user_data.get("broadcast_buttons"):
+            context.user_data["broadcast_buttons"] = []
+        
+        context.user_data["broadcast_buttons"].append({
+            "text": text,
+            "url": url,
+            "type": "url"
+        })
+        
+        success_msg = f"✅ Added URL button: {text}"
+    else:
+        # Callback button
+        text = button_config
+        
+        if not context.user_data.get("broadcast_buttons"):
+            context.user_data["broadcast_buttons"] = []
+        
+        context.user_data["broadcast_buttons"].append({
+            "text": text,
+            "callback_data": f"broadcast_btn_{len(context.user_data['broadcast_buttons'])}",
+            "type": "callback"
+        })
+        
+        success_msg = f"✅ Added button: {text}"
+    
+    context.user_data["awaiting_button"] = False
+    
+    # Show updated button configuration
+    buttons = context.user_data.get("broadcast_buttons", [])
+    button_list = "\n".join([f"{i+1}. {btn['text']}" for i, btn in enumerate(buttons)])
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ Add Button", callback_data="add_button")],
+        [InlineKeyboardButton("✅ Done, Send Broadcast", callback_data="buttons_done")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"{success_msg}\n\n"
+        f"🔘 **Button Configuration**\n\n"
+        f"Current buttons:\n{button_list}\n\n"
+        f"Add more buttons or proceed to send.",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    
+    return BROADCAST_FILTER_MESSAGE
+
+
+async def show_filtered_broadcast_confirmation(update, context: ContextTypes.DEFAULT_TYPE):
+    """Show confirmation dialog for filtered broadcast."""
+    broadcast_type = context.user_data.get("broadcast_type", "filtered")
+    filters = context.user_data.get("filters", {})
+    message_type = context.user_data.get("message_type", "text")
+    message_text = context.user_data.get("broadcast_message", "")
+    buttons = context.user_data.get("broadcast_buttons", [])
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Confirm Send", callback_data="broadcast_filtered_confirm"),
+            InlineKeyboardButton("❌ Cancel", callback_data="broadcast_cancel"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Build preview text based on broadcast type
+    if broadcast_type == "targeted_users":
+        target_user_ids = context.user_data.get("target_user_ids", [])
+        preview_text = (
+            f"📢 **Targeted User Broadcast Preview**\n\n"
+            f"🎯 **Target Users:** {len(target_user_ids)} user(s)\n"
+            f"IDs: {', '.join(map(str, target_user_ids[:5]))}{' ...' if len(target_user_ids) > 5 else ''}\n\n"
+            f"📋 **Message Type:** {message_type.title()}\n\n"
+        )
+    else:
+        gender_filter = filters.get("gender", "All")
+        country_filter = filters.get("country", "All")
+        preview_text = (
+            f"📢 **Filtered Broadcast Preview**\n\n"
+            f"🎯 **Filters:**\n"
+            f"👤 Gender: {gender_filter}\n"
+            f"🌍 Country: {country_filter}\n\n"
+            f"📋 **Message Type:** {message_type.title()}\n\n"
+        )
+    
+    if message_type == "photo":
+        preview_text += f"📷 Photo with caption:\n{message_text if message_text else '(no caption)'}\n\n"
+    else:
+        preview_text += f"**Message:**\n{message_text}\n\n"
+    
+    if buttons:
+        button_list = "\n".join([f"• {btn['text']}" for btn in buttons])
+        preview_text += f"**Buttons:**\n{button_list}\n\n"
+    
+    preview_text += "Ready to send?"
+    
+    # Determine the target message object
+    if hasattr(update, 'callback_query') and update.callback_query:
+        # Called from a callback query
+        target = update.callback_query.message
+    elif hasattr(update, 'message') and update.message:
+        # Called from a regular message
+        target = update.message
+    else:
+        # Fallback
+        target = update
+    
+    if message_type == "photo" and "photo_file_id" in context.user_data:
+        await target.reply_photo(
+            photo=context.user_data["photo_file_id"],
+            caption=preview_text,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+    else:
+        await target.reply_text(
+            preview_text,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+
+
+async def filtered_broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle filtered broadcast confirmation."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    callback_data = query.data
+    message_type = context.user_data.get("message_type", "text")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        # Handle both photo and text messages
+        if message_type == "photo" and query.message.photo:
+            await query.edit_message_caption(
+                caption="⛔ You don't have permission to use this command."
+            )
+        else:
+            await query.edit_message_text(
+                "⛔ You don't have permission to use this command."
+            )
+        return ConversationHandler.END
+    
+    if callback_data == "broadcast_cancel":
+        # Handle both photo and text messages
+        if message_type == "photo" and query.message.photo:
+            await query.edit_message_caption(caption="❌ Broadcast cancelled.")
+        else:
+            await query.edit_message_text("❌ Broadcast cancelled.")
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    elif callback_data == "broadcast_filtered_confirm":
+        broadcast_type = context.user_data.get("broadcast_type", "filtered")
+        filters = context.user_data.get("filters", {})
+        message_text = context.user_data.get("broadcast_message", "")
+        photo_file_id = context.user_data.get("photo_file_id")
+        
+        if not message_text and message_type != "photo":
+            if message_type == "photo" and query.message.photo:
+                await query.edit_message_caption(caption="❌ No message to broadcast.")
+            else:
+                await query.edit_message_text("❌ No message to broadcast.")
+            return ConversationHandler.END
+        
+        # Handle both photo and text messages
+        status_text = (
+            "📤 Fetching target users and sending broadcast...\n"
+            "This may take a few moments."
+        )
+        if message_type == "photo" and query.message.photo:
+            await query.edit_message_caption(caption=status_text)
+        else:
+            await query.edit_message_text(status_text)
+        
+        # Get target users based on broadcast type
+        if broadcast_type == "targeted_users":
+            target_users = context.user_data.get("target_user_ids", [])
+            filter_desc = f"Targeted {len(target_users)} specific user(s)"
+        else:
+            target_users = await admin_manager.get_users_by_filters(
+                gender=filters.get("gender"),
+                country=filters.get("country")
+            )
+            filter_desc = f"Gender: {filters.get('gender', 'All')}, Country: {filters.get('country', 'All')}"
+        
+        if not target_users:
+            await context.bot.send_message(
+                user_id,
+                "⚠️ No users match the specified criteria.",
+                parse_mode="Markdown",
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
+        
+        # Send broadcast
+        success_count = 0
+        failed_count = 0
+        buttons = context.user_data.get("broadcast_buttons", [])
+        
+        # Build button markup if buttons exist
+        reply_markup = None
+        if buttons:
+            button_rows = []
+            for btn in buttons:
+                if btn["type"] == "url":
+                    button_rows.append([InlineKeyboardButton(btn["text"], url=btn["url"])])
+                else:
+                    button_rows.append([InlineKeyboardButton(btn["text"], callback_data=btn["callback_data"])])
+            reply_markup = InlineKeyboardMarkup(button_rows)
+        
+        import asyncio
+        
+        for target_user_id in target_users:
+            try:
+                if message_type == "photo" and photo_file_id:
+                    await context.bot.send_photo(
+                        target_user_id,
+                        photo=photo_file_id,
+                        caption=f"📢 **Admin Announcement**\n\n{message_text}" if message_text else "📢 **Admin Announcement**",
+                        parse_mode="Markdown",
+                        reply_markup=reply_markup,
+                    )
+                else:
+                    await context.bot.send_message(
+                        target_user_id,
+                        f"📢 **Admin Announcement**\n\n{message_text}",
+                        parse_mode="Markdown",
+                        reply_markup=reply_markup,
+                    )
+                success_count += 1
+                
+                # Rate limit protection
+                if success_count % 25 == 0:
+                    await asyncio.sleep(1)
+                    
+            except Exception as e:
+                failed_count += 1
+                logger.debug(
+                    "filtered_broadcast_failed",
+                    target_user_id=target_user_id,
+                    error=str(e),
+                )
+        
+        # Record broadcast
+        await admin_manager.record_broadcast(
+            admin_id=user_id,
+            message=message_text or f"[Photo broadcast]",
+            target_type=f"targeted ({filter_desc})",
+            success_count=success_count,
+            failed_count=failed_count,
+        )
+        
+        # Send summary
+        summary_title = "Targeted User Broadcast" if broadcast_type == "targeted_users" else "Filtered Broadcast"
+        await context.bot.send_message(
+            user_id,
+            f"✅ **{summary_title} Complete**\n\n"
+            f"🎯 Target: {filter_desc}\n"
+            f"✅ Sent: {success_count}\n"
+            f"❌ Failed: {failed_count}\n"
+            f"📊 Total: {len(target_users)}",
+            parse_mode="Markdown",
+        )
+        
+        context.user_data.clear()
+        return ConversationHandler.END
+    
+    return BROADCAST_FILTER_MESSAGE
+
+
+async def broadcast_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle callback button clicks from broadcast messages."""
+    query = update.callback_query
+    await query.answer(
+        "👋 Thanks for your response! This button was sent as part of an admin announcement.",
+        show_alert=True
+    )
 
 
 # ============================================
@@ -3540,5 +4159,343 @@ async def resetqueue_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         logger.error("resetqueue_command_error", error=str(e))
         await update.message.reply_text("❌ An error occurred.")
+
+
+async def enablegender_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /enablegender command - enable gender-based matching filter globally."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    try:
+        # Enable gender filter
+        await redis_client.set("matching:gender_filter_enabled", "1")
+        
+        logger.info(
+            "gender_filter_enabled",
+            admin_id=user_id
+        )
+        
+        await update.message.reply_text(
+            "✅ **Gender Filter Enabled**\n\n"
+            "👫 Users will now be matched based on their gender preferences.\n\n"
+            "This affects all new matches going forward.",
+            parse_mode="Markdown"
+        )
+    
+    except Exception as e:
+        logger.error("enablegender_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def disablegender_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /disablegender command - disable gender-based matching filter globally."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    try:
+        # Disable gender filter
+        await redis_client.set("matching:gender_filter_enabled", "0")
+        
+        logger.info(
+            "gender_filter_disabled",
+            admin_id=user_id
+        )
+        
+        await update.message.reply_text(
+            "✅ **Gender Filter Disabled**\n\n"
+            "👫 Gender preferences will be IGNORED during matching.\n"
+            "Users can now match with any gender regardless of preferences.\n\n"
+            "⚠️ This affects all new matches going forward.",
+            parse_mode="Markdown"
+        )
+    
+    except Exception as e:
+        logger.error("disablegender_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def enableregional_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /enableregional command - enable regional matching filter globally."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    try:
+        # Enable regional filter
+        await redis_client.set("matching:regional_filter_enabled", "1")
+        
+        logger.info(
+            "regional_filter_enabled",
+            admin_id=user_id
+        )
+        
+        await update.message.reply_text(
+            "✅ **Regional Filter Enabled**\n\n"
+            "🌍 Users will now be matched based on their country preferences.\n\n"
+            "This affects all new matches going forward.",
+            parse_mode="Markdown"
+        )
+    
+    except Exception as e:
+        logger.error("enableregional_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def disableregional_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /disableregional command - disable regional matching filter globally."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    try:
+        # Disable regional filter
+        await redis_client.set("matching:regional_filter_enabled", "0")
+        
+        logger.info(
+            "regional_filter_disabled",
+            admin_id=user_id
+        )
+        
+        await update.message.reply_text(
+            "✅ **Regional Filter Disabled**\n\n"
+            "🌍 Country preferences will be IGNORED during matching.\n"
+            "Users can now match internationally regardless of preferences.\n\n"
+            "⚠️ This affects all new matches going forward.",
+            parse_mode="Markdown"
+        )
+    
+    except Exception as e:
+        logger.error("disableregional_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def forcematch_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /forcematch command - manually pair two users."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    # Check arguments
+    if not context.args or len(context.args) < 2:
+        await update.message.reply_text(
+            "⚠️ **Force Match Command**\n\n"
+            "**Usage:** `/forcematch <user1_id> <user2_id>`\n\n"
+            "**Example:** `/forcematch 123456789 987654321`\n\n"
+            "This will forcefully match the two users, bypassing all filters and queue logic.\n"
+            "Use only for debugging purposes.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        user1_id = int(context.args[0])
+        user2_id = int(context.args[1])
+        
+        if user1_id == user2_id:
+            await update.message.reply_text("❌ Cannot match a user with themselves.")
+            return
+        
+        # Check if users exist and their states
+        user1_state = await redis_client.get(f"state:{user1_id}")
+        user2_state = await redis_client.get(f"state:{user2_id}")
+        
+        if not user1_state:
+            await update.message.reply_text(f"❌ User {user1_id} not found or has no state.")
+            return
+        if not user2_state:
+            await update.message.reply_text(f"❌ User {user2_id} not found or has no state.")
+            return
+        
+        user1_state = user1_state.decode('utf-8') if isinstance(user1_state, bytes) else user1_state
+        user2_state = user2_state.decode('utf-8') if isinstance(user2_state, bytes) else user2_state
+        
+        # Check if users are already in chat
+        user1_partner = await redis_client.get(f"pair:{user1_id}")
+        user2_partner = await redis_client.get(f"pair:{user2_id}")
+        
+        if user1_partner:
+            await update.message.reply_text(f"❌ User {user1_id} is already in a chat.")
+            return
+        if user2_partner:
+            await update.message.reply_text(f"❌ User {user2_id} is already in a chat.")
+            return
+        
+        # Force the match
+        await redis_client.set(f"pair:{user1_id}", str(user2_id))
+        await redis_client.set(f"pair:{user2_id}", str(user1_id))
+        
+        # Update states to IN_CHAT
+        await redis_client.set(f"state:{user1_id}", "IN_CHAT")
+        await redis_client.set(f"state:{user2_id}", "IN_CHAT")
+        
+        # Remove from queue if present
+        await redis_client.lrem("queue:waiting", 0, str(user1_id))
+        await redis_client.lrem("queue:waiting", 0, str(user2_id))
+        
+        # Initialize activity timestamps
+        from datetime import datetime
+        timestamp = datetime.utcnow().isoformat()
+        await redis_client.set(f"chat:activity:{user1_id}", timestamp)
+        await redis_client.set(f"chat:activity:{user2_id}", timestamp)
+        
+        # Send special notifications to both users
+        special_message = (
+            "✨ 🎉 <b>Special Match Found!</b> 🎉 ✨\n\n"
+            "You've been specially matched with someone amazing! "
+            "This is a unique connection just for you. \n\n"
+            "💬 Start chatting now and enjoy your conversation! 💫\n\n"
+            "<i>Use /next to find a new partner or /stop to end the chat.</i>"
+        )
+        
+        try:
+            await context.bot.send_message(
+                chat_id=user1_id,
+                text=special_message,
+                parse_mode='HTML'
+            )
+            await context.bot.send_message(
+                chat_id=user2_id,
+                text=special_message,
+                parse_mode='HTML'
+            )
+        except Exception as notify_error:
+            logger.error("forcematch_notification_error", error=str(notify_error))
+        
+        logger.info(
+            "force_match_executed",
+            admin_id=user_id,
+            user1_id=user1_id,
+            user2_id=user2_id,
+            user1_previous_state=user1_state,
+            user2_previous_state=user2_state
+        )
+        
+        await update.message.reply_text(
+            f"✅ **Force Match Successful**\n\n"
+            f"👥 Matched Users:\n"
+            f"• User 1: `{user1_id}` (was {user1_state})\n"
+            f"• User 2: `{user2_id}` (was {user2_state})\n\n"
+            f"Both users have been notified with a special message.\n"
+            f"They can now chat with each other.",
+            parse_mode="Markdown"
+        )
+    
+    except ValueError:
+        await update.message.reply_text("❌ Invalid user ID format. Please use numeric IDs.")
+    except Exception as e:
+        logger.error("forcematch_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
+
+async def matchstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /matchstatus command - show current matching filter status."""
+    user_id = update.effective_user.id
+    admin_manager: AdminManager = context.bot_data.get("admin_manager")
+    redis_client = context.bot_data.get("redis")
+    
+    if not admin_manager or not admin_manager.is_admin(user_id):
+        await update.message.reply_text(
+            "⛔ You don't have permission to use this command."
+        )
+        return
+    
+    if not redis_client:
+        await update.message.reply_text("❌ Service unavailable.")
+        return
+    
+    try:
+        # Get filter states
+        gender_filter = await redis_client.get("matching:gender_filter_enabled")
+        regional_filter = await redis_client.get("matching:regional_filter_enabled")
+        
+        # Decode if bytes
+        if isinstance(gender_filter, bytes):
+            gender_filter = gender_filter.decode('utf-8')
+        if isinstance(regional_filter, bytes):
+            regional_filter = regional_filter.decode('utf-8')
+        
+        # Default to enabled if not set
+        gender_enabled = gender_filter != "0" if gender_filter else True
+        regional_enabled = regional_filter != "0" if regional_filter else True
+        
+        # Get queue size
+        queue_size = await redis_client.llen("queue:waiting")
+        
+        gender_status = "✅ Enabled" if gender_enabled else "❌ Disabled"
+        regional_status = "✅ Enabled" if regional_enabled else "❌ Disabled"
+        
+        await update.message.reply_text(
+            f"📊 **Matching System Status**\n\n"
+            f"**Filters:**\n"
+            f"👫 Gender Filter: {gender_status}\n"
+            f"🌍 Regional Filter: {regional_status}\n\n"
+            f"**Queue:**\n"
+            f"📋 Waiting Users: {queue_size}\n\n"
+            f"**Commands:**\n"
+            f"• `/enablegender` - Enable gender filter\n"
+            f"• `/disablegender` - Disable gender filter\n"
+            f"• `/enableregional` - Enable regional filter\n"
+            f"• `/disableregional` - Disable regional filter\n"
+            f"• `/forcematch <id1> <id2>` - Force match users\n"
+            f"• `/matchstatus` - Show this status",
+            parse_mode="Markdown"
+        )
+    
+    except Exception as e:
+        logger.error("matchstatus_command_error", error=str(e))
+        await update.message.reply_text("❌ An error occurred.")
+
 
 
