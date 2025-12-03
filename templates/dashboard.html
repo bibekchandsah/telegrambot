@@ -377,7 +377,7 @@
                     </div>
                     
                     <!-- Filter Controls -->
-                    <div class="search-form" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div class="search-form" style="margin-bottom: 15px;">
                         <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
                             <div class="form-group" style="margin: 0;">
                                 <label style="margin-right: 8px;">Status:</label>
@@ -435,7 +435,7 @@
                     </div>
                     
                     <!-- Block Media Form -->
-                    <div class="search-form" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div class="search-form" style="margin-bottom: 15px;">
                         <div class="form-group">
                             <label>Media Type to Block:</label>
                             <select id="block-media-type">
@@ -492,7 +492,7 @@
                     </div>
                     
                     <!-- Add Bad Word Form -->
-                    <div class="search-form" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div class="search-form" style="margin-bottom: 15px;">
                         <div class="form-group">
                             <label>Add Word/Phrase to Filter:</label>
                             <input type="text" id="new-bad-word" placeholder="Enter word or phrase to block">
@@ -500,7 +500,7 @@
                         <button class="btn-danger" onclick="addBadWordAction()">➕ Add to Filter</button>
                     </div>
 
-                    <div id="bad-words-container" style="display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; background: #fff; border-radius: 8px; min-height: 100px;">
+                    <div id="bad-words-container">
                         <p class="loading">Click Refresh to load bad words</p>
                     </div>
                 </div>
@@ -538,9 +538,9 @@
                 </div>
 
                 <!-- Matching Filters Section -->
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <div class="moderation-section">
                     <h4 style="margin-top: 0;">🔧 Matching Filters</h4>
-                    <p style="color: #666; margin-bottom: 15px;">Control how users are matched with each other</p>
+                    <p style="margin-bottom: 15px;">Control how users are matched with each other</p>
                     
                     <div class="form-group">
                         <label class="toggle-label">
@@ -566,7 +566,7 @@
                 </div>
 
                 <!-- Queue Information Section -->
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <div class="moderation-section">
                     <h4 style="margin-top: 0;">📊 Queue Statistics</h4>
                     
                     <div class="stat-row">
@@ -586,9 +586,9 @@
                 </div>
 
                 <!-- Force Match Section -->
-                <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border: 2px solid #ffc107;">
+                <div class="force-match-container">
                     <h4 style="margin-top: 0;">⚠️ Force Match (Debug)</h4>
-                    <p style="color: #856404; margin-bottom: 15px;">
+                    <p style="margin-bottom: 15px;">
                         <strong>Warning:</strong> This will forcefully match two specific users, bypassing all filters and queue logic. 
                         Use only for debugging purposes.
                     </p>
@@ -603,9 +603,11 @@
                         <input type="number" id="force-match-user2" placeholder="Enter second user ID" min="1">
                     </div>
                     
-                    <button class="btn btn-danger" onclick="forceMatchUsers()">
-                        ⚡ Force Match Users
-                    </button>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn btn-danger" onclick="forceMatchUsers()">
+                            ⚡ Force Match Users
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -617,7 +619,7 @@
                 </div>
 
                 <!-- Bot Messages Configuration -->
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <div class="moderation-section">
                     <h4 style="margin-top: 0;">💬 Bot Messages</h4>
                     
                     <div class="form-group">
@@ -650,12 +652,14 @@
                         <small>Auto-disconnect after this many seconds of inactivity (minimum 60 seconds)</small>
                     </div>
                     
-                    <button class="btn-success" onclick="saveBotMessages()">💾 Save Messages & Duration</button>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn-success" onclick="saveBotMessages()">💾 Save Messages & Duration</button>
+                    </div>
                 </div>
                 
                 <!-- Bot Mode Controls -->
-                <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0;">🔧 Bot Mode Controls</h4>
+                <div class="moderation-section" style="background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(245, 158, 11, 0.15)); border: 1px solid var(--warning-color);">
+                    <h4 style="margin-top: 0; padding-bottom: 15px;">🔧 Bot Mode Controls</h4>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>
@@ -675,19 +679,21 @@
                         </div>
                     </div>
                     
-                    <button class="btn-success" onclick="saveBotModes()">💾 Save Mode Settings</button>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn-success" onclick="saveBotModes()">💾 Save Mode Settings</button>
+                    </div>
                 </div>
                 
                 <!-- Admin Actions -->
-                <div style="background: #f8d7da; padding: 20px; border-radius: 8px;">
-                    <h4 style="margin-top: 0; color: #721c24;">⚠️ Critical Admin Actions</h4>
+                <div class="moderation-section" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15)); border: 1px solid var(--danger-color);">
+                    <h4 style="margin-top: 0; color: var(--danger-color); padding-bottom: 15px;">⚠️ Critical Admin Actions</h4>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div>
                             <button class="btn-danger" onclick="forceLogoutAll()" style="width: 100%;">
                                 🚪 Force Logout All Users
                             </button>
-                            <small style="display: block; margin-top: 5px; color: #721c24;">
+                            <small style="display: block; margin-top: 10px; color: var(--text-secondary); text-align: center;">
                                 Disconnects all active chats and clears all sessions
                             </small>
                         </div>
@@ -696,7 +702,7 @@
                             <button class="btn-danger" onclick="resetQueue()" style="width: 100%;">
                                 🗑️ Reset Entire Queue
                             </button>
-                            <small style="display: block; margin-top: 5px; color: #721c24;">
+                            <small style="display: block; margin-top: 10px; color: var(--text-secondary); text-align: center;">
                                 Removes all users from the matching queue
                             </small>
                         </div>

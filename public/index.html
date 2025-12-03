@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title>MeetGrid - Anonymous Random Chat Bot for Telegram | Connect Instantly</title>
+    <meta name="title" content="MeetGrid - Anonymous Random Chat Bot for Telegram | Connect Instantly">
+    <meta name="description" content="MeetGrid is a free anonymous Telegram chat bot that connects you with random people worldwide. Start chatting instantly, share media, make friends. No signup required!">
+    <meta name="keywords" content="telegram bot, random chat, anonymous chat, meet strangers, telegram random chat, free chat bot, anonymous messaging, stranger chat telegram, meetgrid, meet new people, telegram chat bot, random video chat alternative, omegle telegram, chatroulette telegram">
+    <meta name="author" content="MeetGrid">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="English">
+    <meta name="revisit-after" content="7 days">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yourdomain.com/">
+    <meta property="og:title" content="MeetGrid - Anonymous Random Chat Bot for Telegram">
+    <meta property="og:description" content="Connect with random people worldwide through our free anonymous Telegram chat bot. Share messages, photos, voice notes and more!">
+    <meta property="og:image" content="https://yourdomain.com/og-image.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://yourdomain.com/">
+    <meta property="twitter:title" content="MeetGrid - Anonymous Random Chat Bot for Telegram">
+    <meta property="twitter:description" content="Connect with random people worldwide through our free anonymous Telegram chat bot.">
+    <meta property="twitter:image" content="https://yourdomain.com/twitter-image.jpg">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://yourdomain.com/">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    
+    <!-- Structured Data / JSON-LD -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "MeetGrid",
+        "applicationCategory": "CommunicationApplication",
+        "operatingSystem": "Telegram",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "15000",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "description": "Anonymous random chat bot for Telegram that connects users worldwide for instant conversations",
+        "url": "https://yourdomain.com",
+        "image": "https://yourdomain.com/logo.png",
+        "author": {
+            "@type": "Organization",
+            "name": "MeetGrid"
+        },
+        "datePublished": "2025-01-01",
+        "softwareVersion": "2.0",
+        "featureList": [
+            "Anonymous Random Chat",
+            "Media Sharing Support",
+            "Gender & Country Preferences",
+            "Instant Matching",
+            "Report & Moderation System",
+            "Multi-language Support"
+        ]
+    }
+    </script>
+    
+    <!-- Additional Structured Data for Organization -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "MeetGrid",
+        "url": "https://yourdomain.com",
+        "logo": "https://yourdomain.com/logo.png",
+        "sameAs": [
+            "https://t.me/meetgrid_bot",
+            "https://twitter.com/meetgrid",
+            "https://facebook.com/meetgrid"
+        ],
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "Customer Support",
+            "url": "https://t.me/meetgrid_bot"
+        }
+    }
+    </script>
+    
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "Is MeetGrid completely free?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes! MeetGrid is 100% free to use. There are no hidden charges, subscriptions, or premium features. Connect with people worldwide at no cost."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Is my identity safe and anonymous?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Absolutely! MeetGrid ensures complete anonymity. Your personal information, phone number, and Telegram username are never shared with other users."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "How do I start chatting on MeetGrid?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Simply open the bot on Telegram, press 'Start', then use the /chat command. You'll be matched with a random user instantly and can start your conversation!"
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Can I choose who I chat with?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes! You can set preferences for gender and country using the /preferences command. The bot will try to match you according to your preferences."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "What if I encounter inappropriate behavior?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Use the /report command immediately. We take safety seriously - users with multiple reports are automatically banned. You can also skip to the next person with /next command."
+                }
+            }
+        ]
+    }
+    </script>
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Google Analytics (Replace with your tracking ID) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+    </script>
+</head>
+<body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <!-- Navigation -->
+    <nav class="navbar" role="navigation" aria-label="Main navigation">
+        <div class="container">
+            <div class="nav-wrapper">
+                <a href="#home" class="logo" aria-label="MeetGrid Home">
+                    <span class="logo-icon">🎭</span>
+                    <span class="logo-text">MeetGrid</span>
+                </a>
+                <button class="mobile-menu-toggle" aria-label="Toggle mobile menu" aria-expanded="false">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul class="nav-menu" role="list">
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#how-it-works">How It Works</a></li>
+                    <li><a href="#safety">Safety</a></li>
+                    <li><a href="#faq">FAQ</a></li>
+                    <li><a href="#stats">Stats</a></li>
+                </ul>
+                <a href="https://t.me/meetgrid_bot" class="btn btn-primary" target="_blank" rel="noopener" aria-label="Start chatting on Telegram">
+                    Start Chatting →
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <header id="home" class="hero" role="banner">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    Meet Random People Worldwide on
+                    <span class="gradient-text">Telegram</span>
+                </h1>
+                <p class="hero-description">
+                    Connect instantly with strangers around the globe through our free, anonymous chat bot. 
+                    Share messages, photos, voice notes, and more in complete privacy.
+                </p>
+                <div class="hero-cta">
+                    <a href="https://t.me/meetgrid_bot" class="btn btn-hero btn-primary" target="_blank" rel="noopener">
+                        <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.84 8.673c-.139.623-.499.778-.997.485l-2.764-2.038-1.329 1.281c-.148.148-.271.271-.554.271l.198-2.815 5.092-4.602c.221-.197-.048-.307-.344-.11l-6.298 3.964-2.71-.849c-.589-.184-.601-.589.124-.872l10.586-4.082c.491-.183.92.112.76.872z" fill="currentColor"/>
+                        </svg>
+                        Open in Telegram
+                    </a>
+                    <a href="#how-it-works" class="btn btn-hero btn-secondary">
+                        Learn More
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-number" data-count="50000">0</span>
+                        <span class="stat-label">Active Users</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" data-count="1000000">0</span>
+                        <span class="stat-label">Chats Started</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" data-count="150">0</span>
+                        <span class="stat-label">Countries</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-image">
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="chat-preview">
+                            <div class="message received">
+                                <div class="message-bubble">Hi! 👋 Where are you from?</div>
+                            </div>
+                            <div class="message sent">
+                                <div class="message-bubble">Hello! I'm from Nepal. How about you?</div>
+                            </div>
+                            <div class="message received">
+                                <div class="message-bubble">Cool! I'm from Brazil 🇧🇷</div>
+                            </div>
+                            <div class="typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="hero-background">
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+        </div>
+    </header>
+    
+    <!-- Features Section -->
+    <main id="main-content">
+        <section id="features" class="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">Why Choose MeetGrid?</h2>
+                    <p class="section-description">
+                        Experience the best anonymous chat platform with powerful features designed for your safety and enjoyment
+                    </p>
+                </div>
+                <div class="features-grid">
+                    <article class="feature-card">
+                        <div class="feature-icon">🎭</div>
+                        <h3 class="feature-title">100% Anonymous</h3>
+                        <p class="feature-description">
+                            Your identity is completely protected. No personal information is ever shared with chat partners.
+                        </p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3 class="feature-title">Instant Matching</h3>
+                        <p class="feature-description">
+                            Get matched with a random person in seconds. No waiting, no forms - just instant connections.
+                        </p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon">🌍</div>
+                        <h3 class="feature-title">Global Reach</h3>
+                        <p class="feature-description">
+                            Connect with people from 150+ countries. Set preferences for gender and location.
+                        </p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon">📱</div>
+                        <h3 class="feature-title">Full Media Support</h3>
+                        <p class="feature-description">
+                            Share text, photos, videos, voice notes, stickers, documents, and more with your chat partner.
+                        </p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3 class="feature-title">Safe & Moderated</h3>
+                        <p class="feature-description">
+                            Advanced reporting system and auto-ban feature keeps the community safe and respectful.
+                        </p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon">💯</div>
+                        <h3 class="feature-title">Always Free</h3>
+                        <p class="feature-description">
+                            No subscriptions, no hidden fees, no premium features. Everything is free forever.
+                        </p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3 class="feature-title">Smart Preferences</h3>
+                        <p class="feature-description">
+                            Filter matches by gender, country, and media preferences for better conversations.
+                        </p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon">🔄</div>
+                        <h3 class="feature-title">Skip Anytime</h3>
+                        <p class="feature-description">
+                            Not vibing with someone? Use /next to instantly skip to a new random chat partner.
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+        
+        <!-- How It Works Section -->
+        <section id="how-it-works" class="how-it-works">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">How It Works</h2>
+                    <p class="section-description">
+                        Start chatting in just 3 simple steps
+                    </p>
+                </div>
+                <div class="steps-grid">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <h3 class="step-title">Open the Bot</h3>
+                        <p class="step-description">
+                            Click the "Open in Telegram" button or search for <strong>@YourBotUsername</strong> on Telegram and press Start.
+                        </p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <h3 class="step-title">Use /chat Command</h3>
+                        <p class="step-description">
+                            Type <code>/chat</code> and you'll be instantly matched with a random person from anywhere in the world.
+                        </p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <h3 class="step-title">Start Chatting!</h3>
+                        <p class="step-description">
+                            Begin your anonymous conversation. Share messages, media, and connect with interesting people worldwide.
+                        </p>
+                    </div>
+                </div>
+                <div class="commands-section">
+                    <h3 class="commands-title">Available Commands</h3>
+                    <div class="commands-grid">
+                        <div class="command-item">
+                            <code>/start</code>
+                            <span>Start the bot and see welcome message</span>
+                        </div>
+                        <div class="command-item">
+                            <code>/chat</code>
+                            <span>Find a random chat partner</span>
+                        </div>
+                        <div class="command-item">
+                            <code>/stop</code>
+                            <span>End current conversation</span>
+                        </div>
+                        <div class="command-item">
+                            <code>/next</code>
+                            <span>Skip to next person</span>
+                        </div>
+                        <div class="command-item">
+                            <code>/preferences</code>
+                            <span>Set gender & country filters</span>
+                        </div>
+                        <div class="command-item">
+                            <code>/report</code>
+                            <span>Report inappropriate behavior</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Safety Section -->
+        <section id="safety" class="safety">
+            <div class="container">
+                <div class="safety-content">
+                    <div class="safety-text">
+                        <h2 class="section-title">Your Safety is Our Priority</h2>
+                        <p class="section-description">
+                            We've built comprehensive safety features to ensure a positive experience for everyone
+                        </p>
+                        <ul class="safety-features">
+                            <li>
+                                <svg class="check-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+                                </svg>
+                                <div>
+                                    <strong>Auto-Ban System:</strong> Users with 5+ reports are automatically banned
+                                </div>
+                            </li>
+                            <li>
+                                <svg class="check-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+                                </svg>
+                                <div>
+                                    <strong>Instant Reporting:</strong> Report inappropriate behavior with one command
+                                </div>
+                            </li>
+                            <li>
+                                <svg class="check-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+                                </svg>
+                                <div>
+                                    <strong>Complete Anonymity:</strong> Your personal info is never shared
+                                </div>
+                            </li>
+                            <li>
+                                <svg class="check-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+                                </svg>
+                                <div>
+                                    <strong>24/7 Moderation:</strong> Active admin team monitoring reports
+                                </div>
+                            </li>
+                            <li>
+                                <svg class="check-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+                                </svg>
+                                <div>
+                                    <strong>Rate Limiting:</strong> Prevents spam and abuse
+                                </div>
+                            </li>
+                            <li>
+                                <svg class="check-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+                                </svg>
+                                <div>
+                                    <strong>Skip Feature:</strong> Exit uncomfortable situations instantly
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="safety-image">
+                        <div class="shield-graphic">
+                            <svg width="300" height="300" viewBox="0 0 300 300" fill="none">
+                                <path d="M150 30L250 80V150C250 200 210 240 150 270C90 240 50 200 50 150V80L150 30Z" fill="url(#shield-gradient)" stroke="currentColor" stroke-width="4"/>
+                                <path d="M110 150L135 175L190 120" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                                <defs>
+                                    <linearGradient id="shield-gradient" x1="150" y1="30" x2="150" y2="270">
+                                        <stop offset="0%" stop-color="#667eea"/>
+                                        <stop offset="100%" stop-color="#764ba2"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Stats Section -->
+        <section id="stats" class="stats-section">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">MeetGrid by the Numbers</h2>
+                    <p class="section-description">Join thousands of users connecting daily</p>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value" data-count="50000">0</div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💬</div>
+                        <div class="stat-value" data-count="1000000">0</div>
+                        <div class="stat-label">Total Chats</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🌍</div>
+                        <div class="stat-value" data-count="150">0</div>
+                        <div class="stat-label">Countries</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-value">4.8</div>
+                        <div class="stat-label">User Rating</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- FAQ Section -->
+        <section id="faq" class="faq">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">Frequently Asked Questions</h2>
+                    <p class="section-description">Everything you need to know about MeetGrid</p>
+                </div>
+                <div class="faq-grid">
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>Is MeetGrid completely free?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes! MeetGrid is 100% free to use. There are no hidden charges, subscriptions, or premium features. Connect with people worldwide at no cost.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>Is my identity safe and anonymous?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Absolutely! MeetGrid ensures complete anonymity. Your personal information, phone number, and Telegram username are never shared with other users. You remain completely anonymous throughout all conversations.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>How do I start chatting on MeetGrid?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Simply open the bot on Telegram by clicking the "Open in Telegram" button, press 'Start', then use the <code>/chat</code> command. You'll be matched with a random user instantly and can start your conversation!</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>Can I choose who I chat with?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes! You can set preferences for gender and country using the <code>/preferences</code> command. The bot will try to match you according to your preferences. You can also skip to the next person anytime with <code>/next</code>.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>What types of media can I share?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>MeetGrid supports all Telegram media types including text messages, photos, videos, voice notes, audio files, stickers, GIFs, documents, and location sharing. Configure your media preferences with <code>/mediasettings</code>.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>What if I encounter inappropriate behavior?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Use the <code>/report</code> command immediately. We take safety seriously - users with 5 or more reports are automatically banned. You can also skip to the next person instantly with <code>/next</code> command.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>How many people can I chat with per day?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>There's no limit! You can chat with as many people as you want. Use <code>/next</code> to skip to a new partner or <code>/stop</code> to end a chat and start fresh with <code>/chat</code>.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" aria-expanded="false">
+                            <span>Does MeetGrid work on mobile and desktop?</span>
+                            <svg class="faq-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes! Since MeetGrid runs on Telegram, it works seamlessly on all devices where Telegram is available - iOS, Android, Windows, macOS, Linux, and web browsers.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <div class="container">
+                <div class="cta-content">
+                    <h2 class="cta-title">Ready to Meet New People?</h2>
+                    <p class="cta-description">
+                        Join 50,000+ users connecting daily on MeetGrid. Start your first anonymous conversation in seconds!
+                    </p>
+                    <a href="https://t.me/meetgrid_bot" class="btn btn-hero btn-primary btn-large" target="_blank" rel="noopener">
+                        <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.84 8.673c-.139.623-.499.778-.997.485l-2.764-2.038-1.329 1.281c-.148.148-.271.271-.554.271l.198-2.815 5.092-4.602c.221-.197-.048-.307-.344-.11l-6.298 3.964-2.71-.849c-.589-.184-.601-.589.124-.872l10.586-4.082c.491-.183.92.112.76.872z" fill="currentColor"/>
+                        </svg>
+                        Start Chatting Now - It's Free!
+                    </a>
+                    <p class="cta-note">No signup required • 100% Anonymous • Always Free</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">
+                        <span class="logo-icon">🎭</span>
+                        MeetGrid
+                    </h3>
+                    <p class="footer-description">
+                        The best anonymous random chat bot for Telegram. Connect with people worldwide, share moments, and make friends.
+                    </p>
+                    <div class="social-links">
+                        <a href="https://t.me/meetgrid_bot" aria-label="Telegram" target="_blank" rel="noopener">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.84 8.673c-.139.623-.499.778-.997.485l-2.764-2.038-1.329 1.281c-.148.148-.271.271-.554.271l.198-2.815 5.092-4.602c.221-.197-.048-.307-.344-.11l-6.298 3.964-2.71-.849c-.589-.184-.601-.589.124-.872l10.586-4.082c.491-.183.92.112.76.872z"/>
+                            </svg>
+                        </a>
+                        <a href="https://twitter.com/meetgrid" aria-label="Twitter" target="_blank" rel="noopener">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-section-title">Quick Links</h4>
+                    <ul class="footer-links">
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#safety">Safety</a></li>
+                        <li><a href="#faq">FAQ</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-section-title">Support</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://t.me/meetgrid_bot" target="_blank" rel="noopener">Contact Support</a></li>
+                        <li><a href="/privacy-policy.html">Privacy Policy</a></li>
+                        <li><a href="/terms.html">Terms of Service</a></li>
+                        <li><a href="/community-guidelines.html">Community Guidelines</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-section-title">Keywords</h4>
+                    <div class="footer-keywords">
+                        <span>telegram bot</span>
+                        <span>random chat</span>
+                        <span>anonymous chat</span>
+                        <span>meet strangers</span>
+                        <span>omegle alternative</span>
+                        <span>stranger chat</span>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 MeetGrid. All rights reserved.</p>
+                <p>Made with ❤️ for anonymous conversations</p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Back to top button -->
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+    
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+</body>
+</html>
