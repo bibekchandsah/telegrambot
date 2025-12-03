@@ -69,3 +69,33 @@ rating - Rate your last chat
 report - Report abuse
 cancel - cancel current operation
 help - Show help information
+
+
+Name: MeetGrid
+Description: "Connect with random strangers anonymously! Chat, share media, and make new friends in a safe environment. 🌐✨"
+Short Description: "Anonymous random chat bot - Connect with strangers worldwide! 🌍"
+
+
+
+Edit About
+(feature focused)
+Connect with random strangers anonymously! Chat, share media, and make new friends safely. 🌐✨
+
+Edit Description
+🌐 MeetGrid - Anonymous Random Chat
+
+Connect with strangers worldwide! 
+✨ Random matching with safety controls
+💬 Text, voice, photos & videos supported
+🎯 Filter by gender & country preferences
+⭐️ Rate your conversations
+🛡 Report system for safety
+
+Start chatting anonymously now!
+
+(simple & clear)
+Meet new people anonymously! MeetGrid connects you with random strangers for text and media chats. Set preferences, stay safe with our report system, and enjoy anonymous conversations worldwide. 🌍
+
+(concise)
+Anonymous random chat bot. Connect with strangers, share media, set preferences, and chat safely. Your identity stays private. Start meeting new people now! 🌐✨
+

@@ -4541,7 +4541,7 @@ async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     elif action == "action_settings":
         # Show settings menu
         keyboard = [
-            [InlineKeyboardButton("👤 Edit Profile", callback_data="action_profile")],
+            [InlineKeyboardButton("👤 Edit Profile", callback_data="action_edit_profile")],
             [InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences")],
             [InlineKeyboardButton("📁 Media Settings", callback_data="action_media")],
             [InlineKeyboardButton("⭐ Rating", callback_data="action_rating")],
@@ -4549,90 +4549,26 @@ async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "⚙️ **Settings**\n\nChoose what you want to configure:",
+            "⚙️ **Settings Menu**\n\nChoose what you want to configure:",
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
     
-    elif action == "action_profile":
-        # Show profile - create a fake update with message context
-        profile_manager: ProfileManager = context.bot_data.get("profile_manager")
-        if not profile_manager:
-            await query.message.reply_text("❌ Service unavailable.")
-            return
-        
-        profile = await profile_manager.get_profile(user_id)
-        if not profile:
-            await query.message.reply_text(
-                "👤 **Your Profile**\n\n"
-                "You haven't created a profile yet.\n"
-                "Use /editprofile to create one!",
-                parse_mode="Markdown"
-            )
-        else:
-            gender_emoji = {"male": "👨", "female": "👩"}.get(profile.get("gender", ""), "👤")
-            await query.message.reply_text(
-                f"👤 **Your Profile**\n\n"
-                f"{gender_emoji} Gender: {profile.get('gender', 'Not set').title()}\n"
-                f"📝 Nickname: {profile.get('nickname', 'Not set')}\n"
-                f"🌍 Country: {profile.get('country', 'Not set')}\n\n"
-                f"Use /editprofile to update your profile.",
-                parse_mode="Markdown"
-            )
+    elif action == "action_edit_profile":
+        # Trigger /editprofile command
+        await editprofile_command(update, context)
     
     elif action == "action_preferences":
-        # Show preferences
-        preference_manager: PreferenceManager = context.bot_data.get("preference_manager")
-        if not preference_manager:
-            await query.message.reply_text("❌ Service unavailable.")
-            return
-        
-        prefs = await preference_manager.get_preferences(user_id)
-        gender_pref = prefs.get("gender", "any")
-        country_pref = prefs.get("country", "any")
-        
-        gender_text = {"male": "👨 Male only", "female": "👩 Female only", "any": "👥 Any gender"}.get(gender_pref, "👥 Any")
-        country_text = f"🌍 {country_pref}" if country_pref != "any" else "🌍 Any country"
-        
-        await query.message.reply_text(
-            f"🎯 **Your Matching Preferences**\n\n"
-            f"Gender: {gender_text}\n"
-            f"Country: {country_text}\n\n"
-            f"Use /preferences to update your preferences.",
-            parse_mode="Markdown"
-        )
+        # Trigger /preferences command
+        await preferences_command(update, context)
     
     elif action == "action_media":
-        # Show media settings
-        media_manager: MediaPreferenceManager = context.bot_data.get("media_manager")
-        if not media_manager:
-            await query.message.reply_text("❌ Service unavailable.")
-            return
-        
-        prefs = await media_manager.get_preferences(user_id)
-        text = prefs.get("text", True)
-        photo = prefs.get("photo", True)
-        video = prefs.get("video", True)
-        voice = prefs.get("voice", True)
-        
-        await query.message.reply_text(
-            f"📁 **Media Settings**\n\n"
-            f"{'✅' if text else '❌'} Text messages\n"
-            f"{'✅' if photo else '❌'} Photos\n"
-            f"{'✅' if video else '❌'} Videos\n"
-            f"{'✅' if voice else '❌'} Voice messages\n\n"
-            f"Use /mediasettings to update your media preferences.",
-            parse_mode="Markdown"
-        )
+        # Trigger /mediasettings command
+        await mediasettings_command(update, context)
     
     elif action == "action_rating":
-        # Show rating prompt
-        await query.message.reply_text(
-            "⭐ **Rate Your Last Chat**\n\n"
-            "Use /rating to rate your last chat partner.\n"
-            "Your feedback helps improve matching quality!",
-            parse_mode="Markdown"
-        )
+        # Trigger /rating command
+        await rating_command(update, context)
     
     elif action == "action_help":
         # Show help
