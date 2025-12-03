@@ -43,8 +43,11 @@ class Config:
         """Validate required configuration."""
         if not cls.BOT_TOKEN:
             raise ValueError("BOT_TOKEN environment variable is required")
-        if not cls.REDIS_URL:
-            raise ValueError("REDIS_URL environment variable is required")
+        # REDIS_URL has a default, but warn if using localhost in production
+        if cls.IS_PRODUCTION and "localhost" in cls.REDIS_URL:
+            import sys
+            print("WARNING: Using localhost Redis in production. Set REDIS_URL environment variable.", file=sys.stderr)
+            print(f"Current REDIS_URL: {cls.REDIS_URL}", file=sys.stderr)
     
     @classmethod
     def is_production(cls):
