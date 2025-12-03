@@ -25,9 +25,5 @@ ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=production
 
-# Health check (optional - Railway doesn't require it but good practice)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD python -c "import redis; r = redis.from_url('${REDIS_URL}'); r.ping()" || exit 1
-
 # Run the bot
 CMD ["python", "-u", "-m", "src.bot"]
