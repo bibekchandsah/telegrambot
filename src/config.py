@@ -35,6 +35,9 @@ class Config:
     # Environment
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     
+    # Production settings
+    IS_PRODUCTION = ENVIRONMENT == "production"
+    
     @classmethod
     def validate(cls):
         """Validate required configuration."""
@@ -42,6 +45,27 @@ class Config:
             raise ValueError("BOT_TOKEN environment variable is required")
         if not cls.REDIS_URL:
             raise ValueError("REDIS_URL environment variable is required")
+    
+    @classmethod
+    def is_production(cls):
+        """Check if running in production mode."""
+        return cls.IS_PRODUCTION
+    
+    @classmethod
+    def get_log_config(cls):
+        """Get logging configuration based on environment."""
+        if cls.IS_PRODUCTION:
+            return {
+                "level": "INFO",
+                "format": "json",  # Structured logging for production
+                "output": "stdout"
+            }
+        else:
+            return {
+                "level": "DEBUG",
+                "format": "text",  # Human-readable for development
+                "output": "console"
+            }
 
 
 # Validate on import

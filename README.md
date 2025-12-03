@@ -253,15 +253,37 @@ All keys have TTL (Time To Live) for automatic cleanup.
 
 ## 🚢 Deployment Options
 
-### Railway.app
+### Railway.app (Recommended - No Sleep!)
 
-1. Create new project on [Railway](https://railway.app)
-2. Add Redis service from marketplace
-3. Connect GitHub repository
-4. Add environment variables:
-   - `BOT_TOKEN`
-   - `REDIS_URL` (auto-provided by Railway)
-5. Deploy!
+**✅ Runs 24/7 with no automatic sleep**  
+**✅ Perfect for Telegram bots with polling**  
+**✅ Free tier: $5 credit/month (~500-600 hours)**
+
+#### Quick Deploy (5 minutes):
+
+1. **Push to GitHub:**
+   ```bash
+   git add .
+   git commit -m "Deploy to Railway"
+   git push origin main
+   ```
+
+2. **Deploy on Railway:**
+   - Go to [railway.app](https://railway.app)
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+   - Add Redis database (+ New → Database → Redis)
+
+3. **Set Variables:**
+   - `BOT_TOKEN` - Your bot token
+   - `ADMIN_IDS` - Your Telegram user ID
+   - `ENVIRONMENT` - `production`
+
+4. **Done!** Bot deploys in 2-3 minutes
+
+📖 **Full Guide:** See `RAILWAY_DEPLOYMENT.md` for detailed instructions  
+🚀 **Quick Start:** See `QUICK_DEPLOY.md` for fast deployment  
+✅ **Pre-flight Check:** Run `python check_deployment.py` before deploying
 
 ### Render.com
 

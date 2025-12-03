@@ -51,3 +51,4 @@ Examples:
 /enableregional
 /disableregional
 /forcematch
+/matchstatus
