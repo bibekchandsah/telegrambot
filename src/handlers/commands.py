@@ -173,9 +173,29 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Replace {first_name} placeholder if present
     welcome_message = welcome_message.replace("{first_name}", user.first_name)
     
+    # Create inline keyboard with main actions
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("💬 Start Chat", callback_data="action_start_chat"),
+            InlineKeyboardButton("⚙️ Settings", callback_data="action_settings"),
+        ],
+        [
+            InlineKeyboardButton("👤 Profile", callback_data="action_profile"),
+            InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences"),
+        ],
+        [
+            InlineKeyboardButton("📊 My Rating", callback_data="action_rating"),
+            InlineKeyboardButton("❓ Help", callback_data="action_help"),
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await update.message.reply_text(
         welcome_message,
         parse_mode="Markdown",
+        reply_markup=reply_markup,
     )
     
     logger.info("start_command", user_id=user.id, username=user.username)
@@ -4496,6 +4516,62 @@ async def matchstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         logger.error("matchstatus_command_error", error=str(e))
         await update.message.reply_text("❌ An error occurred.")
+
+
+async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle inline keyboard button clicks from main menu."""
+    query = update.callback_query
+    await query.answer()
+    
+    action = query.data
+    user_id = update.effective_user.id
+    
+    # Route to appropriate command
+    if action == "action_start_chat":
+        # Simulate /chat command
+        await query.message.reply_text("🔍 Searching for a partner...")
+        # Call chat command logic
+        await chat_command(update, context)
+    
+    elif action == "action_settings":
+        # Show settings menu
+        keyboard = [
+            [InlineKeyboardButton("👤 Edit Profile", callback_data="action_profile")],
+            [InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences")],
+            [InlineKeyboardButton("📁 Media Settings", callback_data="action_media")],
+            [InlineKeyboardButton("🔙 Back to Menu", callback_data="action_back")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "⚙️ **Settings**\n\nChoose what you want to configure:",
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+    
+    elif action == "action_profile":
+        # Show profile
+        await profile_command(update, context)
+    
+    elif action == "action_preferences":
+        # Show preferences
+        await preferences_command(update, context)
+    
+    elif action == "action_media":
+        # Show media settings
+        await mediasettings_command(update, context)
+    
+    elif action == "action_rating":
+        # Show rating
+        await rating_command(update, context)
+    
+    elif action == "action_help":
+        # Show help
+        await help_command(update, context)
+    
+    elif action == "action_back":
+        # Go back to main menu - resend start message
+        await start_command(update, context)
+
 
 
 

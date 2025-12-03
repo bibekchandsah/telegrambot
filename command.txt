@@ -52,3 +52,20 @@ Examples:
 /disableregional
 /forcematch
 /matchstatus
+
+
+
+
+
+
+start - Start a new chat session
+chat - Find a random partner
+stop - End current chat
+next - Skip to next partner
+profile - View/edit your profile
+preferences - Set matching preferences
+mediasettings - Configure media types
+rating - Rate your last chat
+report - Report abuse
+cancel - cancel current operation
+help - Show help information

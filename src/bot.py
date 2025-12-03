@@ -89,6 +89,7 @@ from src.handlers.commands import (
     disableregional_command,
     forcematch_command,
     matchstatus_command,
+    menu_button_callback,
     NICKNAME,
     GENDER,
     COUNTRY,
@@ -161,6 +162,24 @@ async def post_init(application: Application):
             username=bot_info.username,
             name=bot_info.first_name,
         )
+        
+        # Set bot commands menu
+        from telegram import BotCommand
+        commands = [
+            BotCommand("start", "Start a new chat session"),
+            BotCommand("chat", "Find a random partner"),
+            BotCommand("stop", "End current chat"),
+            BotCommand("next", "Skip to next partner"),
+            BotCommand("profile", "View/edit your profile"),
+            BotCommand("preferences", "Set matching preferences"),
+            BotCommand("mediasettings", "Configure media types"),
+            BotCommand("rating", "Rate your last chat"),
+            BotCommand("report", "Report abuse"),
+            BotCommand("cancel", "Cancel current operation"),
+            BotCommand("help", "Show help information"),
+        ]
+        await application.bot.set_my_commands(commands)
+        logger.info("bot_commands_set", count=len(commands))
         
         # Start notification sender background job (if job_queue available)
         if application.job_queue:
@@ -432,6 +451,14 @@ def main():
         application.add_handler(CommandHandler("disableregional", disableregional_command))
         application.add_handler(CommandHandler("forcematch", forcematch_command))
         application.add_handler(CommandHandler("matchstatus", matchstatus_command))
+        
+        # Register menu button callback handler
+        application.add_handler(
+            CallbackQueryHandler(
+                menu_button_callback,
+                pattern="^action_",
+            )
+        )
         
         # Register feedback callback handler
         application.add_handler(
