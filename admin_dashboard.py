@@ -1,6 +1,7 @@
 """Admin Dashboard - Web-based interface for bot administration."""
 import asyncio
 import json
+import os
 import time
 from datetime import datetime
 from typing import Optional
