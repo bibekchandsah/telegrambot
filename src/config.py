@@ -32,6 +32,11 @@ class Config:
     DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "5000"))
     DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     
+    # TOTP Authentication settings
+    TOTP_SECRET = os.getenv("TOTP_SECRET")  # If not set, will be generated and shown as QR
+    TOTP_MAX_ATTEMPTS = int(os.getenv("TOTP_MAX_ATTEMPTS", "5"))
+    SESSION_SECRET = os.getenv("SESSION_SECRET", os.urandom(24).hex())
+    
     # Environment
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     

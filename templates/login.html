@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - TOTP Authentication</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>🔒 Admin Dashboard</h1>
+                <p>Two-Factor Authentication</p>
+            </div>
+
+            {% if show_qr %}
+            <!-- QR Code Setup -->
+            <div class="qr-section">
+                <div class="alert alert-info">
+                    <strong>⚠️ First Time Setup Required</strong>
+                    <p>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                </div>
+                
+                <div class="qr-code-container">
+                    <img src="data:image/png;base64,{{ qr_code }}" alt="TOTP QR Code" class="qr-code">
+                </div>
+                
+                <div class="secret-info">
+                    <p><strong>Secret Key (Manual Entry):</strong></p>
+                    <div class="secret-key">{{ secret_key }}</div>
+                    <small>Save this secret key securely. You'll need it if you lose access to your authenticator app.</small>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>⚡ Important:</strong> Add the following to your <code>.env</code> file:
+                    <pre>TOTP_SECRET={{ secret_key }}</pre>
+                    <p>After adding it, restart the dashboard to use normal TOTP login.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- TOTP Input Form -->
+            <form method="POST" action="/login" class="login-form">
+                <div class="form-group">
+                    <label for="totp_code">Enter 6-digit code from your authenticator app:</label>
+                    <input 
+                        type="text" 
+                        id="totp_code" 
+                        name="totp_code" 
+                        class="totp-input" 
+                        placeholder="000000" 
+                        maxlength="6" 
+                        pattern="[0-9]{6}" 
+                        required 
+                        autofocus
+                        autocomplete="off"
+                    >
+                </div>
+
+                {% if error %}
+                <div class="alert alert-error">
+                    <strong>❌ {{ error }}</strong>
+                    {% if attempts_left %}
+                    <p>Attempts remaining: <strong>{{ attempts_left }}</strong></p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if locked %}
+                <div class="alert alert-error">
+                    <strong>🔒 Account Locked</strong>
+                    <p>Too many failed attempts. Please restart the dashboard to try again.</p>
+                </div>
+                {% else %}
+                <button type="submit" class="btn-login">
+                    🔓 Verify & Login
+                </button>
+                {% endif %}
+
+                <div class="attempts-indicator">
+                    {% if attempts_used %}
+                    <span class="attempts-text">
+                        Attempts: {{ attempts_used }} / {{ max_attempts }}
+                    </span>
+                    {% endif %}
+                </div>
+            </form>
+
+            <div class="login-footer">
+                <p>🔐 Secured with Time-based One-Time Password (TOTP)</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-format input to digits only
+        document.getElementById('totp_code').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+
+        // Auto-submit when 6 digits entered (optional)
+        document.getElementById('totp_code').addEventListener('input', function(e) {
+            if (this.value.length === 6) {
+                // Optional: Auto-submit after a short delay
+                // setTimeout(() => this.form.submit(), 300);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -98,7 +98,7 @@ async function loadStats() {
 async function loadAllUsers(page = 1) {
     currentPage = page;
     const tbody = document.getElementById('all-users-table');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
     
     try {
         const response = await fetch(`/api/users?page=${page}&per_page=${perPage}`);
@@ -114,20 +114,20 @@ async function loadAllUsers(page = 1) {
             // Create pagination
             createPagination(data.page, data.total_pages);
         } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="no-data">No users found</td></tr>';
             document.getElementById('pagination-info').textContent = '';
             document.getElementById('pagination').innerHTML = '';
         }
     } catch (error) {
         console.error('Error loading users:', error);
-        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error loading users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">Error loading users</td></tr>';
     }
 }
 
 // Load online users
 async function loadOnlineUsers() {
     const tbody = document.getElementById('online-users-table');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
     
     try {
         const response = await fetch('/api/users/online');
@@ -136,18 +136,18 @@ async function loadOnlineUsers() {
         if (users && users.length > 0) {
             tbody.innerHTML = users.map(user => createUserRow(user)).join('');
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" class="no-data">No online users</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="no-data">No online users</td></tr>';
         }
     } catch (error) {
         console.error('Error loading online users:', error);
-        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error loading users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">Error loading users</td></tr>';
     }
 }
 
 // Load users in chat
 async function loadUsersInChat() {
     const tbody = document.getElementById('in-chat-table');
-    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
     
     try {
         const response = await fetch('/api/users/in-chat');
@@ -156,18 +156,18 @@ async function loadUsersInChat() {
         if (users && users.length > 0) {
             tbody.innerHTML = users.map(user => createUserRowWithPartner(user)).join('');
         } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No users in chat</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No users in chat</td></tr>';
         }
     } catch (error) {
         console.error('Error loading users in chat:', error);
-        tbody.innerHTML = '<tr><td colspan="6" class="no-data">Error loading users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">Error loading users</td></tr>';
     }
 }
 
 // Load users in queue
 async function loadUsersInQueue() {
     const tbody = document.getElementById('in-queue-table');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
     
     try {
         const response = await fetch('/api/users/in-queue');
@@ -176,23 +176,24 @@ async function loadUsersInQueue() {
         if (users && users.length > 0) {
             tbody.innerHTML = users.map(user => createUserRow(user)).join('');
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" class="no-data">No users in queue</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="no-data">No users in queue</td></tr>';
         }
     } catch (error) {
         console.error('Error loading users in queue:', error);
-        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error loading users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">Error loading users</td></tr>';
     }
 }
 
 // Search users
 async function searchUsers() {
     const tbody = document.getElementById('search-results-table');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading">Searching...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Searching...</td></tr>';
     
     const userId = document.getElementById('search-user-id').value;
     const username = document.getElementById('search-username').value;
     const gender = document.getElementById('search-gender').value;
     const country = document.getElementById('search-country').value;
+    const sortBy = document.getElementById('search-sort-by').value;
     
     const params = new URLSearchParams();
     if (userId) params.append('user_id', userId);
@@ -202,16 +203,39 @@ async function searchUsers() {
     
     try {
         const response = await fetch(`/api/users/search?${params}`);
-        const users = await response.json();
+        let users = await response.json();
+        
+        // Apply sorting if selected
+        if (users && users.length > 0 && sortBy !== 'none') {
+            users = sortUsers(users, sortBy);
+        }
         
         if (users && users.length > 0) {
             tbody.innerHTML = users.map(user => createUserRow(user)).join('');
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" class="no-data">No users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="no-data">No users found</td></tr>';
         }
     } catch (error) {
         console.error('Error searching users:', error);
-        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error searching users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">Error searching users</td></tr>';
+    }
+}
+
+// Sort users array based on selected criteria
+function sortUsers(users, sortBy) {
+    const sortedUsers = [...users]; // Create a copy to avoid mutating original
+    
+    switch (sortBy) {
+        case 'created_asc':
+            return sortedUsers.sort((a, b) => (a.account_created_at || 0) - (b.account_created_at || 0));
+        case 'created_desc':
+            return sortedUsers.sort((a, b) => (b.account_created_at || 0) - (a.account_created_at || 0));
+        case 'activity_asc':
+            return sortedUsers.sort((a, b) => (a.last_activity_at || 0) - (b.last_activity_at || 0));
+        case 'activity_desc':
+            return sortedUsers.sort((a, b) => (b.last_activity_at || 0) - (a.last_activity_at || 0));
+        default:
+            return sortedUsers;
     }
 }
 
@@ -221,14 +245,20 @@ function clearSearch() {
     document.getElementById('search-username').value = '';
     document.getElementById('search-gender').value = '';
     document.getElementById('search-country').value = '';
+    document.getElementById('search-sort-by').value = 'none';
     document.getElementById('search-results-table').innerHTML = 
-        '<tr><td colspan="5" class="no-data">Enter search criteria above</td></tr>';
+        '<tr><td colspan="7" class="no-data">Enter search criteria above</td></tr>';
 }
 
 // Create user table row
 function createUserRow(user) {
+    const createdAt = formatTimestamp(user.account_created_at);
+    const lastActivity = formatTimestamp(user.last_activity_at);
+    
     return `
         <tr>
+            <td><span class="timestamp">${createdAt}</span></td>
+            <td><span class="timestamp">${lastActivity}</span></td>
             <td>${user.user_id}</td>
             <td>${user.username || 'N/A'}</td>
             <td>${user.gender || 'N/A'}</td>
@@ -244,8 +274,13 @@ function createUserRow(user) {
 
 // Create user table row with partner
 function createUserRowWithPartner(user) {
+    const createdAt = formatTimestamp(user.account_created_at);
+    const lastActivity = formatTimestamp(user.last_activity_at);
+    
     return `
         <tr>
+            <td><span class="timestamp">${createdAt}</span></td>
+            <td><span class="timestamp">${lastActivity}</span></td>
             <td>${user.user_id}</td>
             <td>${user.username || 'N/A'}</td>
             <td>${user.gender || 'N/A'}</td>
@@ -1687,6 +1722,68 @@ function showNotification(message, type = 'info') {
     // Simple notification - you can enhance this with better UI
     const alertClass = type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info';
     console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
+// Format timestamp for display
+function formatTimestamp(timestamp) {
+    if (!timestamp) {
+        return '<span style="color: #94a3b8;">Never</span>';
+    }
+    
+    try {
+        // Python sends Unix timestamp in seconds, JavaScript Date needs milliseconds
+        // If timestamp is less than a reasonable date (year 2000), it's likely in seconds
+        let dateMs = timestamp;
+        if (timestamp < 10000000000) {
+            // It's in seconds, convert to milliseconds
+            dateMs = timestamp * 1000;
+        }
+        
+        const date = new Date(dateMs);
+        
+        // Check if valid date
+        if (isNaN(date.getTime())) {
+            return '<span style="color: #94a3b8;">N/A</span>';
+        }
+        
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        // Format based on how recent
+        let relativeTime = '';
+        let color = '#10b981'; // green for recent
+        
+        if (diffMins < 1) {
+            relativeTime = 'Just now';
+            color = '#10b981';
+        } else if (diffMins < 60) {
+            relativeTime = `${diffMins}m ago`;
+            color = '#10b981';
+        } else if (diffHours < 24) {
+            relativeTime = `${diffHours}h ago`;
+            color = '#3b82f6';
+        } else if (diffDays < 7) {
+            relativeTime = `${diffDays}d ago`;
+            color = '#f59e0b';
+        } else if (diffDays < 30) {
+            relativeTime = `${diffDays}d ago`;
+            color = '#94a3b8';
+        } else {
+            // Show full date for older
+            relativeTime = date.toLocaleDateString();
+            color = '#94a3b8';
+        }
+        
+        // Full timestamp for tooltip
+        const fullTimestamp = date.toLocaleString();
+        
+        return `<span style="color: ${color};" title="${fullTimestamp}">${relativeTime}</span>`;
+    } catch (error) {
+        return '<span style="color: #94a3b8;">N/A</span>';
+    }
 }
 
 

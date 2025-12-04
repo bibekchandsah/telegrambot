@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Telegram Bot</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -81,6 +83,8 @@
                     <table class="user-table">
                         <thead>
                             <tr>
+                                <th>Created At</th>
+                                <th>Last Activity</th>
                                 <th>User ID</th>
                                 <th>Username</th>
                                 <th>Gender</th>
@@ -89,7 +93,9 @@
                             </tr>
                         </thead>
                         <tbody id="all-users-table">
-                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                            <tr>
+                                <td colspan="7" class="loading">Loading...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -106,6 +112,8 @@
                     <table class="user-table">
                         <thead>
                             <tr>
+                                <th>Created At</th>
+                                <th>Last Activity</th>
                                 <th>User ID</th>
                                 <th>Username</th>
                                 <th>Gender</th>
@@ -114,7 +122,9 @@
                             </tr>
                         </thead>
                         <tbody id="online-users-table">
-                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                            <tr>
+                                <td colspan="7" class="loading">Loading...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -130,6 +140,8 @@
                     <table class="user-table">
                         <thead>
                             <tr>
+                                <th>Created At</th>
+                                <th>Last Activity</th>
                                 <th>User ID</th>
                                 <th>Username</th>
                                 <th>Gender</th>
@@ -139,7 +151,9 @@
                             </tr>
                         </thead>
                         <tbody id="in-chat-table">
-                            <tr><td colspan="6" class="loading">Loading...</td></tr>
+                            <tr>
+                                <td colspan="8" class="loading">Loading...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -155,6 +169,8 @@
                     <table class="user-table">
                         <thead>
                             <tr>
+                                <th>Created At</th>
+                                <th>Last Activity</th>
                                 <th>User ID</th>
                                 <th>Username</th>
                                 <th>Gender</th>
@@ -163,7 +179,9 @@
                             </tr>
                         </thead>
                         <tbody id="in-queue-table">
-                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                            <tr>
+                                <td colspan="7" class="loading">Loading...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -196,6 +214,16 @@
                         <label>Country:</label>
                         <input type="text" id="search-country" placeholder="Enter country">
                     </div>
+                    <div class="form-group">
+                        <label>Sort By:</label>
+                        <select id="search-sort-by">
+                            <option value="">No Sorting</option>
+                            <option value="created_asc">Created At (Oldest First)</option>
+                            <option value="created_desc">Created At (Newest First)</option>
+                            <option value="activity_asc">Last Activity (Oldest First)</option>
+                            <option value="activity_desc">Last Activity (Recent First)</option>
+                        </select>
+                    </div>
                     <button class="btn btn-primary" onclick="searchUsers()">🔍 Search</button>
                     <button class="btn btn-secondary" onclick="clearSearch()">Clear</button>
                 </div>
@@ -203,6 +231,8 @@
                     <table class="user-table">
                         <thead>
                             <tr>
+                                <th>Created At</th>
+                                <th>Last Activity</th>
                                 <th>User ID</th>
                                 <th>Username</th>
                                 <th>Gender</th>
@@ -211,518 +241,549 @@
                             </tr>
                         </thead>
                         <tbody id="search-results-table">
-                            <tr><td colspan="5" class="no-data">Enter search criteria above</td></tr>
+                            <tr>
+                                <td colspan="7" class="no-data">Enter search criteria above</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Moderation Tab -->
+        <div id="moderation" class="tab-pane">
+            <div class="section-header">
+                <h2>User Moderation</h2>
+            </div>
+
+            <!-- Ban User Section -->
+            <div class="moderation-section">
+                <h3>🚫 Ban User</h3>
+                <div class="search-form">
+                    <div class="form-group">
+                        <label>User ID:</label>
+                        <input type="text" id="ban-user-id" placeholder="Enter user ID to ban">
+                    </div>
+                    <div class="form-group">
+                        <label>Reason:</label>
+                        <select id="ban-reason">
+                            <option value="">Select reason</option>
+                            <option value="nudity">Nudity/Sexual Content</option>
+                            <option value="spam">Spam/Advertising</option>
+                            <option value="abuse">Verbal Abuse/Harassment</option>
+                            <option value="fake_reports">Fake Reports</option>
+                            <option value="harassment">Persistent Harassment</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Duration:</label>
+                        <select id="ban-duration">
+                            <option value="">Select duration</option>
+                            <option value="1h">1 Hour</option>
+                            <option value="24h">24 Hours</option>
+                            <option value="7d">7 Days</option>
+                            <option value="30d">30 Days</option>
+                            <option value="permanent">Permanent</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-danger" onclick="banUser()">🚫 Ban User</button>
+                </div>
+            </div>
+
+            <!-- Unban User Section -->
+            <div class="moderation-section">
+                <h3>✅ Unban User</h3>
+                <div class="search-form">
+                    <div class="form-group">
+                        <label>User ID:</label>
+                        <input type="text" id="unban-user-id" placeholder="Enter user ID to unban">
+                    </div>
+                    <button class="btn btn-success" onclick="unbanUser()">✅ Unban User</button>
+                </div>
+            </div>
+
+            <!-- Warn User Section -->
+            <div class="moderation-section">
+                <h3>⚠️ Warn User</h3>
+                <div class="search-form">
+                    <div class="form-group">
+                        <label>User ID:</label>
+                        <input type="text" id="warn-user-id" placeholder="Enter user ID to warn">
+                    </div>
+                    <div class="form-group">
+                        <label>Warning Reason:</label>
+                        <textarea id="warn-reason" placeholder="Enter warning reason" rows="3"></textarea>
+                    </div>
+                    <button class="btn btn-warning" onclick="warnUser()">⚠️ Issue Warning</button>
+                </div>
+            </div>
+
+            <!-- Check Ban Status Section -->
+            <div class="moderation-section">
+                <h3>🔍 Check Ban Status</h3>
+                <div class="search-form">
+                    <div class="form-group">
+                        <label>User ID:</label>
+                        <input type="text" id="check-ban-user-id" placeholder="Enter user ID to check">
+                    </div>
+                    <button class="btn btn-primary" onclick="checkBanStatus()">🔍 Check Status</button>
+                </div>
+                <div id="ban-status-result" class="status-result"></div>
+            </div>
+
+            <!-- Banned Users List -->
+            <div class="moderation-section">
+                <div class="section-header">
+                    <h3>Banned Users List</h3>
+                    <button class="btn btn-primary" onclick="loadBannedUsers()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Reason</th>
+                                <th>Duration</th>
+                                <th>Banned At</th>
+                                <th>Expires At</th>
+                                <th>Banned By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="banned-users-table">
+                            <tr>
+                                <td colspan="7" class="loading">Click Refresh to load</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Moderation Tab -->
-            <div id="moderation" class="tab-pane">
+            <!-- Warned Users List -->
+            <div class="moderation-section">
                 <div class="section-header">
-                    <h2>User Moderation</h2>
+                    <h3>Warned Users List</h3>
+                    <button class="btn btn-primary" onclick="loadWarnedUsers()">🔄 Refresh</button>
                 </div>
-
-                <!-- Ban User Section -->
-                <div class="moderation-section">
-                    <h3>🚫 Ban User</h3>
-                    <div class="search-form">
-                        <div class="form-group">
-                            <label>User ID:</label>
-                            <input type="text" id="ban-user-id" placeholder="Enter user ID to ban">
-                        </div>
-                        <div class="form-group">
-                            <label>Reason:</label>
-                            <select id="ban-reason">
-                                <option value="">Select reason</option>
-                                <option value="nudity">Nudity/Sexual Content</option>
-                                <option value="spam">Spam/Advertising</option>
-                                <option value="abuse">Verbal Abuse/Harassment</option>
-                                <option value="fake_reports">Fake Reports</option>
-                                <option value="harassment">Persistent Harassment</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Duration:</label>
-                            <select id="ban-duration">
-                                <option value="">Select duration</option>
-                                <option value="1h">1 Hour</option>
-                                <option value="24h">24 Hours</option>
-                                <option value="7d">7 Days</option>
-                                <option value="30d">30 Days</option>
-                                <option value="permanent">Permanent</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-danger" onclick="banUser()">🚫 Ban User</button>
-                    </div>
-                </div>
-
-                <!-- Unban User Section -->
-                <div class="moderation-section">
-                    <h3>✅ Unban User</h3>
-                    <div class="search-form">
-                        <div class="form-group">
-                            <label>User ID:</label>
-                            <input type="text" id="unban-user-id" placeholder="Enter user ID to unban">
-                        </div>
-                        <button class="btn btn-success" onclick="unbanUser()">✅ Unban User</button>
-                    </div>
-                </div>
-
-                <!-- Warn User Section -->
-                <div class="moderation-section">
-                    <h3>⚠️ Warn User</h3>
-                    <div class="search-form">
-                        <div class="form-group">
-                            <label>User ID:</label>
-                            <input type="text" id="warn-user-id" placeholder="Enter user ID to warn">
-                        </div>
-                        <div class="form-group">
-                            <label>Warning Reason:</label>
-                            <textarea id="warn-reason" placeholder="Enter warning reason" rows="3"></textarea>
-                        </div>
-                        <button class="btn btn-warning" onclick="warnUser()">⚠️ Issue Warning</button>
-                    </div>
-                </div>
-
-                <!-- Check Ban Status Section -->
-                <div class="moderation-section">
-                    <h3>🔍 Check Ban Status</h3>
-                    <div class="search-form">
-                        <div class="form-group">
-                            <label>User ID:</label>
-                            <input type="text" id="check-ban-user-id" placeholder="Enter user ID to check">
-                        </div>
-                        <button class="btn btn-primary" onclick="checkBanStatus()">🔍 Check Status</button>
-                    </div>
-                    <div id="ban-status-result" class="status-result"></div>
-                </div>
-
-                <!-- Banned Users List -->
-                <div class="moderation-section">
-                    <div class="section-header">
-                        <h3>Banned Users List</h3>
-                        <button class="btn btn-primary" onclick="loadBannedUsers()">🔄 Refresh</button>
-                    </div>
-                    <div class="table-container">
-                        <table class="user-table">
-                            <thead>
-                                <tr>
-                                    <th>User ID</th>
-                                    <th>Reason</th>
-                                    <th>Duration</th>
-                                    <th>Banned At</th>
-                                    <th>Expires At</th>
-                                    <th>Banned By</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="banned-users-table">
-                                <tr><td colspan="7" class="loading">Click Refresh to load</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Warned Users List -->
-                <div class="moderation-section">
-                    <div class="section-header">
-                        <h3>Warned Users List</h3>
-                        <button class="btn btn-primary" onclick="loadWarnedUsers()">🔄 Refresh</button>
-                    </div>
-                    <div class="table-container">
-                        <table class="user-table">
-                            <thead>
-                                <tr>
-                                    <th>User ID</th>
-                                    <th>Warning Count</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="warned-users-table">
-                                <tr><td colspan="3" class="loading">Click Refresh to load</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Reports & Safety Tab -->
-            <div id="reports" class="tab-pane">
-                <div class="section-header">
-                    <h2>🛡️ Reports & Safety Management</h2>
-                </div>
-
-                <!-- Report Statistics -->
-                <div class="stats-container" style="margin-bottom: 20px;">
-                    <div class="stat-card">
-                        <h3 id="total-reports-count">0</h3>
-                        <p>Total Reports</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3 id="reported-users-count">0</h3>
-                        <p>Reported Users</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3 id="pending-reports-count">0</h3>
-                        <p>Pending Reports</p>
-                    </div>
-                </div>
-
-                <!-- User Reports Section -->
-                <div class="moderation-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>📋 User Reports</h3>
-                        <button class="btn-primary" onclick="loadAllReports()">🔄 Refresh Reports</button>
-                    </div>
-                    
-                    <!-- Filter Controls -->
-                    <div class="search-form" style="margin-bottom: 15px;">
-                        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                            <div class="form-group" style="margin: 0;">
-                                <label style="margin-right: 8px;">Status:</label>
-                                <select id="filter-status" onchange="applyReportFilters()" style="padding: 8px;">
-                                    <option value="all">All Status</option>
-                                    <option value="pending" selected>Pending</option>
-                                    <option value="approved">Approved</option>
-                                    <option value="rejected">Rejected</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin: 0;">
-                                <label style="margin-right: 8px;">Flag Type:</label>
-                                <select id="filter-flag" onchange="applyReportFilters()" style="padding: 8px;">
-                                    <option value="all">All Flags</option>
-                                    <option value="nudity">Nudity</option>
-                                    <option value="harassment">Harassment</option>
-                                    <option value="spam">Spam</option>
-                                    <option value="scam">Scam</option>
-                                    <option value="fake">Fake Profile</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin: 0;">
-                                <label style="margin-right: 8px;">User ID:</label>
-                                <input type="text" id="filter-userid" placeholder="Filter by User ID" onkeyup="applyReportFilters()" style="padding: 8px; width: 150px;">
-                            </div>
-                            <button class="btn-primary" onclick="clearReportFilters()" style="padding: 8px 15px;">Clear Filters</button>
-                        </div>
-                    </div>
-                    
-                    <div class="table-container">
-                        <table class="user-table">
-                            <thead>
-                                <tr>
-                                    <th>Reported User</th>
-                                    <th>Reporter</th>
-                                    <th>Flag Type</th>
-                                    <th>Report Time</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="reports-table">
-                                <tr><td colspan="6" class="loading">Click Refresh to load reports</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Media Blocking Section -->
-                <div class="moderation-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>🚫 Media Type Blocking</h3>
-                        <button class="btn-primary" onclick="loadBlockedMedia()">🔄 Refresh</button>
-                    </div>
-                    
-                    <!-- Block Media Form -->
-                    <div class="search-form" style="margin-bottom: 15px;">
-                        <div class="form-group">
-                            <label>Media Type to Block:</label>
-                            <select id="block-media-type">
-                                <option value="">Select media type</option>
-                                <option value="photo">📷 Photo</option>
-                                <option value="video">🎥 Video</option>
-                                <option value="voice">🎤 Voice</option>
-                                <option value="sticker">😊 Sticker</option>
-                                <option value="gif">🎞️ GIF</option>
-                                <option value="document">📄 Document</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Reason:</label>
-                            <input type="text" id="block-media-reason" placeholder="Reason for blocking">
-                        </div>
-                        <div class="form-group">
-                            <label>Duration:</label>
-                            <select id="block-media-duration">
-                                <option value="permanent">Permanent</option>
-                                <option value="1h">1 Hour</option>
-                                <option value="6h">6 Hours</option>
-                                <option value="24h">24 Hours</option>
-                                <option value="7d">7 Days</option>
-                            </select>
-                        </div>
-                        <button class="btn-danger" onclick="blockMediaAction()">🚫 Block Media</button>
-                    </div>
-
-                    <div class="table-container">
-                        <table class="user-table">
-                            <thead>
-                                <tr>
-                                    <th>Media Type</th>
-                                    <th>Blocked At</th>
-                                    <th>Reason</th>
-                                    <th>Duration</th>
-                                    <th>Expires At</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="blocked-media-table">
-                                <tr><td colspan="6" class="loading">Click Refresh to load blocked media</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Bad Word Filter Section -->
-                <div class="moderation-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>🔤 Bad Word Filter</h3>
-                        <button class="btn-primary" onclick="loadBadWords()">🔄 Refresh</button>
-                    </div>
-                    
-                    <!-- Add Bad Word Form -->
-                    <div class="search-form" style="margin-bottom: 15px;">
-                        <div class="form-group">
-                            <label>Add Word/Phrase to Filter:</label>
-                            <input type="text" id="new-bad-word" placeholder="Enter word or phrase to block">
-                        </div>
-                        <button class="btn-danger" onclick="addBadWordAction()">➕ Add to Filter</button>
-                    </div>
-
-                    <div id="bad-words-container">
-                        <p class="loading">Click Refresh to load bad words</p>
-                    </div>
-                </div>
-
-                <!-- Moderation Logs Section -->
-                <div class="moderation-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>📜 Moderation Logs</h3>
-                        <button class="btn-primary" onclick="loadModerationLogs()">🔄 Refresh</button>
-                    </div>
-                    <div class="table-container">
-                        <table class="user-table">
-                            <thead>
-                                <tr>
-                                    <th>Timestamp</th>
-                                    <th>Admin ID</th>
-                                    <th>Action</th>
-                                    <th>Target User</th>
-                                    <th>Details</th>
-                                </tr>
-                            </thead>
-                            <tbody id="moderation-logs-table">
-                                <tr><td colspan="5" class="loading">Click Refresh to load logs</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Matching Control Tab -->
-            <div id="matching-control" class="tab-pane">
-                <div class="section-header">
-                    <h2>🎯 Matching Control</h2>
-                    <button class="btn btn-primary" onclick="loadMatchingSettings()">🔄 Refresh</button>
-                </div>
-
-                <!-- Matching Filters Section -->
-                <div class="moderation-section">
-                    <h4 style="margin-top: 0;">🔧 Matching Filters</h4>
-                    <p style="margin-bottom: 15px;">Control how users are matched with each other</p>
-                    
-                    <div class="form-group">
-                        <label class="toggle-label">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="gender-filter-enabled" onchange="updateMatchingFilters()">
-                                <span class="toggle-slider"></span>
-                            </label>
-                            <span>👫 Gender Filter</span>
-                        </label>
-                        <small style="display: block; margin-top: 5px;">When enabled, users are matched based on their gender preferences</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="toggle-label">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="regional-filter-enabled" onchange="updateMatchingFilters()">
-                                <span class="toggle-slider"></span>
-                            </label>
-                            <span>🌍 Regional Filter</span>
-                        </label>
-                        <small style="display: block; margin-top: 5px;">When enabled, users are matched with others from the same country</small>
-                    </div>
-                </div>
-
-                <!-- Queue Information Section -->
-                <div class="moderation-section">
-                    <h4 style="margin-top: 0;">📊 Queue Statistics</h4>
-                    
-                    <div class="stat-row">
-                        <div class="stat-item">
-                            <div class="stat-label">Current Queue Size:</div>
-                            <div class="stat-value-large" id="queue-size-display">-</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Last Updated:</div>
-                            <div class="stat-value-large" id="queue-last-updated">-</div>
-                        </div>
-                    </div>
-                    
-                    <button class="btn btn-secondary" onclick="loadQueueSize()" style="margin-top: 15px;">
-                        🔄 Refresh Queue Size
-                    </button>
-                </div>
-
-                <!-- Force Match Section -->
-                <div class="force-match-container">
-                    <h4 style="margin-top: 0;">⚠️ Force Match (Debug)</h4>
-                    <p style="margin-bottom: 15px;">
-                        <strong>Warning:</strong> This will forcefully match two specific users, bypassing all filters and queue logic. 
-                        Use only for debugging purposes.
-                    </p>
-                    
-                    <div class="form-group">
-                        <label>User ID 1:</label>
-                        <input type="number" id="force-match-user1" placeholder="Enter first user ID" min="1">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>User ID 2:</label>
-                        <input type="number" id="force-match-user2" placeholder="Enter second user ID" min="1">
-                    </div>
-                    
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button class="btn btn-danger" onclick="forceMatchUsers()">
-                            ⚡ Force Match Users
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bot Settings Tab -->
-            <div id="bot-settings" class="tab-pane">
-                <div class="section-header">
-                    <h2>⚙️ Bot Settings & Configuration</h2>
-                    <button class="btn btn-primary" onclick="loadBotSettings()">🔄 Refresh</button>
-                </div>
-
-                <!-- Bot Messages Configuration -->
-                <div class="moderation-section">
-                    <h4 style="margin-top: 0;">💬 Bot Messages</h4>
-                    
-                    <div class="form-group">
-                        <label>Welcome Message:</label>
-                        <textarea id="welcome-message" rows="6" placeholder="Enter welcome message (leave empty for default)"></textarea>
-                        <small>Shown when users start the bot with /start</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Match Found Message:</label>
-                        <textarea id="match-found-message" rows="4" placeholder="Enter match found message (leave empty for default)"></textarea>
-                        <small>Shown when a chat partner is found</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Chat End Message (User Ends Chat):</label>
-                        <textarea id="chat-end-message" rows="4" placeholder="Enter chat end message (leave empty for default)"></textarea>
-                        <small>Shown to user when they end the chat with /stop</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Partner Left Message (Partner Leaves):</label>
-                        <textarea id="partner-left-message" rows="4" placeholder="Enter partner left message (leave empty for default)"></textarea>
-                        <small>Shown when partner leaves or skips to next chat</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Inactivity Auto-Disconnect Duration (seconds):</label>
-                        <input type="number" id="inactivity-duration" min="60" max="3600" placeholder="300" value="300">
-                        <small>Auto-disconnect after this many seconds of inactivity (minimum 60 seconds)</small>
-                    </div>
-                    
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button class="btn-success" onclick="saveBotMessages()">💾 Save Messages & Duration</button>
-                    </div>
-                </div>
-                
-                <!-- Bot Mode Controls -->
-                <div class="moderation-section" style="background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(245, 158, 11, 0.15)); border: 1px solid var(--warning-color);">
-                    <h4 style="margin-top: 0; padding-bottom: 15px;">🔧 Bot Mode Controls</h4>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                        <div>
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                <input type="checkbox" id="maintenance-mode" style="width: 20px; height: 20px;">
-                                <span style="font-weight: 600;">🔒 Maintenance Mode</span>
-                            </label>
-                            <small style="display: block; margin-left: 30px; margin-top: 5px;">Bot will not accept any commands</small>
-                        </div>
-                        
-                        <div>
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                <input type="checkbox" id="registrations-enabled" checked style="width: 20px; height: 20px;">
-                                <span style="font-weight: 600;">✅ Allow New Registrations</span>
-                            </label>
-                            <small style="display: block; margin-left: 30px; margin-top: 5px;">New users can start using the bot</small>
-                        </div>
-                    </div>
-                    
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button class="btn-success" onclick="saveBotModes()">💾 Save Mode Settings</button>
-                    </div>
-                </div>
-                
-                <!-- Admin Actions -->
-                <div class="moderation-section" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15)); border: 1px solid var(--danger-color);">
-                    <h4 style="margin-top: 0; color: var(--danger-color); padding-bottom: 15px;">⚠️ Critical Admin Actions</h4>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <button class="btn-danger" onclick="forceLogoutAll()" style="width: 100%;">
-                                🚪 Force Logout All Users
-                            </button>
-                            <small style="display: block; margin-top: 10px; color: var(--text-secondary); text-align: center;">
-                                Disconnects all active chats and clears all sessions
-                            </small>
-                        </div>
-                        
-                        <div>
-                            <button class="btn-danger" onclick="resetQueue()" style="width: 100%;">
-                                🗑️ Reset Entire Queue
-                            </button>
-                            <small style="display: block; margin-top: 10px; color: var(--text-secondary); text-align: center;">
-                                Removes all users from the matching queue
-                            </small>
-                        </div>
-                    </div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Warning Count</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="warned-users-table">
+                            <tr>
+                                <td colspan="3" class="loading">Click Refresh to load</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
-        <!-- User Detail Modal -->
-        <div id="user-modal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeUserModal()">&times;</span>
-                <h2>User Details</h2>
-                <div id="user-details">
-                    <p class="loading">Loading...</p>
+        <!-- Reports & Safety Tab -->
+        <div id="reports" class="tab-pane">
+            <div class="section-header">
+                <h2>🛡️ Reports & Safety Management</h2>
+            </div>
+
+            <!-- Report Statistics -->
+            <div class="stats-container" style="margin-bottom: 20px;">
+                <div class="stat-card">
+                    <h3 id="total-reports-count">0</h3>
+                    <p>Total Reports</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="reported-users-count">0</h3>
+                    <p>Reported Users</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="pending-reports-count">0</h3>
+                    <p>Pending Reports</p>
+                </div>
+            </div>
+
+            <!-- User Reports Section -->
+            <div class="moderation-section">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>📋 User Reports</h3>
+                    <button class="btn-primary" onclick="loadAllReports()">🔄 Refresh Reports</button>
+                </div>
+
+                <!-- Filter Controls -->
+                <div class="search-form" style="margin-bottom: 15px;">
+                    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                        <div class="form-group" style="margin: 0;">
+                            <label style="margin-right: 8px;">Status:</label>
+                            <select id="filter-status" onchange="applyReportFilters()" style="padding: 8px;">
+                                <option value="all">All Status</option>
+                                <option value="pending" selected>Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="margin-right: 8px;">Flag Type:</label>
+                            <select id="filter-flag" onchange="applyReportFilters()" style="padding: 8px;">
+                                <option value="all">All Flags</option>
+                                <option value="nudity">Nudity</option>
+                                <option value="harassment">Harassment</option>
+                                <option value="spam">Spam</option>
+                                <option value="scam">Scam</option>
+                                <option value="fake">Fake Profile</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="margin-right: 8px;">User ID:</label>
+                            <input type="text" id="filter-userid" placeholder="Filter by User ID"
+                                onkeyup="applyReportFilters()" style="padding: 8px; width: 150px;">
+                        </div>
+                        <button class="btn-primary" onclick="clearReportFilters()" style="padding: 8px 15px;">Clear
+                            Filters</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>Reported User</th>
+                                <th>Reporter</th>
+                                <th>Flag Type</th>
+                                <th>Report Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table">
+                            <tr>
+                                <td colspan="6" class="loading">Click Refresh to load reports</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Media Blocking Section -->
+            <div class="moderation-section">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>🚫 Media Type Blocking</h3>
+                    <button class="btn-primary" onclick="loadBlockedMedia()">🔄 Refresh</button>
+                </div>
+
+                <!-- Block Media Form -->
+                <div class="search-form" style="margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label>Media Type to Block:</label>
+                        <select id="block-media-type">
+                            <option value="">Select media type</option>
+                            <option value="photo">📷 Photo</option>
+                            <option value="video">🎥 Video</option>
+                            <option value="voice">🎤 Voice</option>
+                            <option value="sticker">😊 Sticker</option>
+                            <option value="gif">🎞️ GIF</option>
+                            <option value="document">📄 Document</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Reason:</label>
+                        <input type="text" id="block-media-reason" placeholder="Reason for blocking">
+                    </div>
+                    <div class="form-group">
+                        <label>Duration:</label>
+                        <select id="block-media-duration">
+                            <option value="permanent">Permanent</option>
+                            <option value="1h">1 Hour</option>
+                            <option value="6h">6 Hours</option>
+                            <option value="24h">24 Hours</option>
+                            <option value="7d">7 Days</option>
+                        </select>
+                    </div>
+                    <button class="btn-danger" onclick="blockMediaAction()">🚫 Block Media</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>Media Type</th>
+                                <th>Blocked At</th>
+                                <th>Reason</th>
+                                <th>Duration</th>
+                                <th>Expires At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="blocked-media-table">
+                            <tr>
+                                <td colspan="6" class="loading">Click Refresh to load blocked media</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Bad Word Filter Section -->
+            <div class="moderation-section">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>🔤 Bad Word Filter</h3>
+                    <button class="btn-primary" onclick="loadBadWords()">🔄 Refresh</button>
+                </div>
+
+                <!-- Add Bad Word Form -->
+                <div class="search-form" style="margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label>Add Word/Phrase to Filter:</label>
+                        <input type="text" id="new-bad-word" placeholder="Enter word or phrase to block">
+                    </div>
+                    <button class="btn-danger" onclick="addBadWordAction()">➕ Add to Filter</button>
+                </div>
+
+                <div id="bad-words-container">
+                    <p class="loading">Click Refresh to load bad words</p>
+                </div>
+            </div>
+
+            <!-- Moderation Logs Section -->
+            <div class="moderation-section">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>📜 Moderation Logs</h3>
+                    <button class="btn-primary" onclick="loadModerationLogs()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Admin ID</th>
+                                <th>Action</th>
+                                <th>Target User</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="moderation-logs-table">
+                            <tr>
+                                <td colspan="5" class="loading">Click Refresh to load logs</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Matching Control Tab -->
+        <div id="matching-control" class="tab-pane">
+            <div class="section-header">
+                <h2>🎯 Matching Control</h2>
+                <button class="btn btn-primary" onclick="loadMatchingSettings()">🔄 Refresh</button>
+            </div>
+
+            <!-- Matching Filters Section -->
+            <div class="moderation-section">
+                <h4 style="margin-top: 0;">🔧 Matching Filters</h4>
+                <p style="margin-bottom: 15px;">Control how users are matched with each other</p>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="gender-filter-enabled" onchange="updateMatchingFilters()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>👫 Gender Filter</span>
+                    </label>
+                    <small style="display: block; margin-top: 5px;">When enabled, users are matched based on their
+                        gender preferences</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="regional-filter-enabled" onchange="updateMatchingFilters()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>🌍 Regional Filter</span>
+                    </label>
+                    <small style="display: block; margin-top: 5px;">When enabled, users are matched with others from the
+                        same country</small>
+                </div>
+            </div>
+
+            <!-- Queue Information Section -->
+            <div class="moderation-section">
+                <h4 style="margin-top: 0;">📊 Queue Statistics</h4>
+
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="stat-label">Current Queue Size:</div>
+                        <div class="stat-value-large" id="queue-size-display">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Last Updated:</div>
+                        <div class="stat-value-large" id="queue-last-updated">-</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" onclick="loadQueueSize()" style="margin-top: 15px;">
+                    🔄 Refresh Queue Size
+                </button>
+            </div>
+
+            <!-- Force Match Section -->
+            <div class="force-match-container">
+                <h4 style="margin-top: 0;">⚠️ Force Match (Debug)</h4>
+                <p style="margin-bottom: 15px;">
+                    <strong>Warning:</strong> This will forcefully match two specific users, bypassing all filters and
+                    queue logic.
+                    Use only for debugging purposes.
+                </p>
+
+                <div class="form-group">
+                    <label>User ID 1:</label>
+                    <input type="number" id="force-match-user1" placeholder="Enter first user ID" min="1">
+                </div>
+
+                <div class="form-group">
+                    <label>User ID 2:</label>
+                    <input type="number" id="force-match-user2" placeholder="Enter second user ID" min="1">
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-danger" onclick="forceMatchUsers()">
+                        ⚡ Force Match Users
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bot Settings Tab -->
+        <div id="bot-settings" class="tab-pane">
+            <div class="section-header">
+                <h2>⚙️ Bot Settings & Configuration</h2>
+                <button class="btn btn-primary" onclick="loadBotSettings()">🔄 Refresh</button>
+            </div>
+
+            <!-- Bot Messages Configuration -->
+            <div class="moderation-section">
+                <h4 style="margin-top: 0;">💬 Bot Messages</h4>
+
+                <div class="form-group">
+                    <label>Welcome Message:</label>
+                    <textarea id="welcome-message" rows="6"
+                        placeholder="Enter welcome message (leave empty for default)"></textarea>
+                    <small>Shown when users start the bot with /start</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Match Found Message:</label>
+                    <textarea id="match-found-message" rows="4"
+                        placeholder="Enter match found message (leave empty for default)"></textarea>
+                    <small>Shown when a chat partner is found</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Chat End Message (User Ends Chat):</label>
+                    <textarea id="chat-end-message" rows="4"
+                        placeholder="Enter chat end message (leave empty for default)"></textarea>
+                    <small>Shown to user when they end the chat with /stop</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Partner Left Message (Partner Leaves):</label>
+                    <textarea id="partner-left-message" rows="4"
+                        placeholder="Enter partner left message (leave empty for default)"></textarea>
+                    <small>Shown when partner leaves or skips to next chat</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Inactivity Auto-Disconnect Duration (seconds):</label>
+                    <input type="number" id="inactivity-duration" min="60" max="3600" placeholder="300" value="300">
+                    <small>Auto-disconnect after this many seconds of inactivity (minimum 60 seconds)</small>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn-success" onclick="saveBotMessages()">💾 Save Messages & Duration</button>
+                </div>
+            </div>
+
+            <!-- Bot Mode Controls -->
+            <div class="moderation-section"
+                style="background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(245, 158, 11, 0.15)); border: 1px solid var(--warning-color);">
+                <h4 style="margin-top: 0; padding-bottom: 15px;">🔧 Bot Mode Controls</h4>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="maintenance-mode" style="width: 20px; height: 20px;">
+                            <span style="font-weight: 600;">🔒 Maintenance Mode</span>
+                        </label>
+                        <small style="display: block; margin-left: 30px; margin-top: 5px;">Bot will not accept any
+                            commands</small>
+                    </div>
+
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="registrations-enabled" checked
+                                style="width: 20px; height: 20px;">
+                            <span style="font-weight: 600;">✅ Allow New Registrations</span>
+                        </label>
+                        <small style="display: block; margin-left: 30px; margin-top: 5px;">New users can start using the
+                            bot</small>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn-success" onclick="saveBotModes()">💾 Save Mode Settings</button>
+                </div>
+            </div>
+
+            <!-- Admin Actions -->
+            <div class="moderation-section"
+                style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15)); border: 1px solid var(--danger-color);">
+                <h4 style="margin-top: 0; color: var(--danger-color); padding-bottom: 15px;">⚠️ Critical Admin Actions
+                </h4>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <button class="btn-danger" onclick="forceLogoutAll()" style="width: 100%;">
+                            🚪 Force Logout All Users
+                        </button>
+                        <small
+                            style="display: block; margin-top: 10px; color: var(--text-secondary); text-align: center;">
+                            Disconnects all active chats and clears all sessions
+                        </small>
+                    </div>
+
+                    <div>
+                        <button class="btn-danger" onclick="resetQueue()" style="width: 100%;">
+                            🗑️ Reset Entire Queue
+                        </button>
+                        <small
+                            style="display: block; margin-top: 10px; color: var(--text-secondary); text-align: center;">
+                            Removes all users from the matching queue
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- User Detail Modal -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeUserModal()">&times;</span>
+            <h2>User Details</h2>
+            <div id="user-details">
+                <p class="loading">Loading...</p>
+            </div>
+        </div>
+    </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
+
 </html>

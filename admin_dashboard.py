@@ -3,11 +3,16 @@ import asyncio
 import json
 import os
 import time
+import io
+import base64
 from datetime import datetime
 from typing import Optional
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_cors import CORS
 from telegram import Bot
+from functools import wraps
+import pyotp
+import qrcode
 from src.config import Config
 from src.db.redis_client import RedisClient
 from src.services.dashboard import DashboardService
@@ -32,6 +37,12 @@ BAN_REASONS = {
 
 app = Flask(__name__)
 CORS(app)
+app.secret_key = Config.SESSION_SECRET
+
+# TOTP Configuration
+totp_secret = Config.TOTP_SECRET
+max_attempts = Config.TOTP_MAX_ATTEMPTS
+failed_attempts = 0
 
 # Thread-local storage for per-request services
 thread_local = local()
@@ -44,11 +55,17 @@ admin_ids = None
 
 async def init_services():
     """Store configuration."""
-    global redis_url, bot_token, admin_ids
+    global redis_url, bot_token, admin_ids, totp_secret
     
     redis_url = Config.REDIS_URL
     bot_token = Config.BOT_TOKEN
     admin_ids = Config.ADMIN_IDS
+    
+    # Generate TOTP secret if not configured
+    if not totp_secret:
+        totp_secret = pyotp.random_base32()
+        logger.warning("TOTP_SECRET not configured. Generated new secret. Please add to .env file.")
+        logger.info(f"Add this to your .env file: TOTP_SECRET={totp_secret}")
     
     # Test connection
     test_client = RedisClient()
@@ -78,6 +95,136 @@ def get_thread_services():
         thread_local.loop = loop
     
     return thread_local.services
+
+
+def get_thread_services():
+    """Get or create services for current thread."""
+    if not hasattr(thread_local, 'services'):
+        # Create new services for this thread
+        async def create_services():
+            client = RedisClient()
+            await client.connect()
+            dashboard = DashboardService(client)
+            admin = AdminManager(client, admin_ids)
+            reports = ReportManager(client)
+            telegram_bot = Bot(token=bot_token)
+            return client, dashboard, admin, reports, telegram_bot
+        
+        # Run in new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        thread_local.services = loop.run_until_complete(create_services())
+        thread_local.loop = loop
+    
+    return thread_local.services
+
+
+def require_auth(f):
+    """Decorator to require TOTP authentication for routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def generate_qr_code(secret: str, name: str = "Admin Dashboard") -> str:
+    """Generate QR code for TOTP setup."""
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=name, issuer_name="Telegram Bot Admin")
+    
+    # Generate QR code
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(uri)
+    qr.make(fit=True)
+    
+    # Convert to image
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Convert to base64
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    
+    return img_str
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """TOTP login page."""
+    global failed_attempts, totp_secret
+    
+    # Check if already authenticated
+    if session.get('authenticated'):
+        return redirect(url_for('index'))
+    
+    # Check if locked out
+    if failed_attempts >= max_attempts:
+        return render_template('login.html', 
+                             locked=True, 
+                             max_attempts=max_attempts,
+                             show_qr=False)
+    
+    if request.method == 'POST':
+        totp_code = request.form.get('totp_code', '').strip()
+        
+        if not totp_code or len(totp_code) != 6:
+            failed_attempts += 1
+            return render_template('login.html',
+                                 error="Invalid code format. Enter 6 digits.",
+                                 attempts_left=max_attempts - failed_attempts,
+                                 attempts_used=failed_attempts,
+                                 max_attempts=max_attempts,
+                                 show_qr=not Config.TOTP_SECRET,
+                                 qr_code=generate_qr_code(totp_secret) if not Config.TOTP_SECRET else None,
+                                 secret_key=totp_secret if not Config.TOTP_SECRET else None)
+        
+        # Verify TOTP code
+        totp = pyotp.TOTP(totp_secret)
+        if totp.verify(totp_code, valid_window=1):
+            # Successful login
+            session['authenticated'] = True
+            session.permanent = False
+            failed_attempts = 0
+            logger.info("Admin authenticated successfully")
+            return redirect(url_for('index'))
+        else:
+            # Failed login
+            failed_attempts += 1
+            logger.warning(f"Failed TOTP attempt. Total attempts: {failed_attempts}/{max_attempts}")
+            
+            if failed_attempts >= max_attempts:
+                logger.error("Maximum TOTP attempts reached. Dashboard locked.")
+                return render_template('login.html',
+                                     locked=True,
+                                     max_attempts=max_attempts,
+                                     show_qr=False)
+            
+            return render_template('login.html',
+                                 error="Invalid code. Please try again.",
+                                 attempts_left=max_attempts - failed_attempts,
+                                 attempts_used=failed_attempts,
+                                 max_attempts=max_attempts,
+                                 show_qr=not Config.TOTP_SECRET,
+                                 qr_code=generate_qr_code(totp_secret) if not Config.TOTP_SECRET else None,
+                                 secret_key=totp_secret if not Config.TOTP_SECRET else None)
+    
+    # GET request - show login form
+    return render_template('login.html',
+                         attempts_used=failed_attempts,
+                         max_attempts=max_attempts,
+                         show_qr=not Config.TOTP_SECRET,
+                         qr_code=generate_qr_code(totp_secret) if not Config.TOTP_SECRET else None,
+                         secret_key=totp_secret if not Config.TOTP_SECRET else None)
+
+
+@app.route('/logout')
+def logout():
+    """Logout route."""
+    session.clear()
+    logger.info("Admin logged out")
+    return redirect(url_for('login'))
 
 
 def run_async(coro):
@@ -196,12 +343,14 @@ async def send_warning_notification_with_bot(bot_instance, user_id: int, reason:
 
 
 @app.route('/')
+@require_auth
 def index():
     """Main dashboard page."""
     return render_template('dashboard.html')
 
 
 @app.route('/api/stats')
+@require_auth
 def get_stats():
     """Get dashboard statistics."""
     try:
@@ -214,6 +363,7 @@ def get_stats():
 
 
 @app.route('/api/users')
+@require_auth
 def get_users():
     """Get all users with pagination."""
     try:
@@ -229,6 +379,7 @@ def get_users():
 
 
 @app.route('/api/users/online')
+@require_auth
 def get_online_users():
     """Get currently online/active users."""
     try:
@@ -241,6 +392,7 @@ def get_online_users():
 
 
 @app.route('/api/users/in-chat')
+@require_auth
 def get_users_in_chat():
     """Get users currently in chat."""
     try:
@@ -253,6 +405,7 @@ def get_users_in_chat():
 
 
 @app.route('/api/users/in-queue')
+@require_auth
 def get_users_in_queue():
     """Get users currently in queue."""
     try:
@@ -265,6 +418,7 @@ def get_users_in_queue():
 
 
 @app.route('/api/users/search')
+@require_auth
 def search_users():
     """Search users by various criteria."""
     try:
@@ -287,6 +441,7 @@ def search_users():
 
 
 @app.route('/api/users/<int:user_id>')
+@require_auth
 def get_user_detail(user_id):
     """Get detailed user profile."""
     try:
@@ -302,6 +457,7 @@ def get_user_detail(user_id):
 
 
 @app.route('/api/users/<int:user_id>/history')
+@require_auth
 def get_user_history(user_id):
     """Get user chat history."""
     try:
@@ -318,6 +474,7 @@ def get_user_history(user_id):
 # ============================================
 
 @app.route('/api/moderation/ban', methods=['POST'])
+@require_auth
 def ban_user():
     """Ban a user."""
     try:
@@ -359,6 +516,7 @@ def ban_user():
 
 
 @app.route('/api/moderation/unban', methods=['POST'])
+@require_auth
 def unban_user():
     """Unban a user."""
     try:
@@ -392,6 +550,7 @@ def unban_user():
 
 
 @app.route('/api/moderation/warn', methods=['POST'])
+@require_auth
 def warn_user():
     """Add warning to a user."""
     try:
@@ -426,6 +585,7 @@ def warn_user():
 
 
 @app.route('/api/moderation/check-ban/<int:user_id>')
+@require_auth
 def check_ban(user_id):
     """Check if user is banned."""
     try:
@@ -456,6 +616,7 @@ def check_ban(user_id):
 
 
 @app.route('/api/moderation/banned-users')
+@require_auth
 def get_banned_users():
     """Get list of all banned users."""
     try:
@@ -490,6 +651,7 @@ def get_banned_users():
 
 
 @app.route('/api/moderation/warned-users')
+@require_auth
 def get_warned_users():
     """Get list of all warned users."""
     try:
@@ -520,6 +682,7 @@ def get_warned_users():
 # ============================================
 
 @app.route('/api/reports/all')
+@require_auth
 def get_all_reports():
     """Get all user reports."""
     try:
@@ -538,6 +701,7 @@ def get_all_reports():
 
 
 @app.route('/api/reports/user/<int:user_id>')
+@require_auth
 def get_user_reports(user_id):
     """Get reports for a specific user."""
     try:
@@ -560,6 +724,7 @@ def get_user_reports(user_id):
 
 
 @app.route('/api/reports/approve', methods=['POST'])
+@require_auth
 def approve_report():
     """Approve a report."""
     try:
@@ -594,6 +759,7 @@ def approve_report():
 
 
 @app.route('/api/reports/reject', methods=['POST'])
+@require_auth
 def reject_report():
     """Reject a report."""
     try:
@@ -629,6 +795,7 @@ def reject_report():
 
 
 @app.route('/api/reports/stats')
+@require_auth
 def get_report_stats():
     """Get report statistics."""
     try:
@@ -644,6 +811,7 @@ def get_report_stats():
 
 
 @app.route('/api/reports/approve-individual', methods=['POST'])
+@require_auth
 def approve_individual_report():
     """Approve a single individual report."""
     try:
@@ -692,6 +860,7 @@ def approve_individual_report():
 
 
 @app.route('/api/reports/reject-individual', methods=['POST'])
+@require_auth
 def reject_individual_report():
     """Reject a single individual report."""
     try:
@@ -742,6 +911,7 @@ def reject_individual_report():
 
 
 @app.route('/api/reports/individual-status')
+@require_auth
 def get_individual_report_status():
     """Get status of an individual report."""
     try:
@@ -773,6 +943,7 @@ def get_individual_report_status():
 
 
 @app.route('/api/reports/all-individual-statuses', methods=['POST'])
+@require_auth
 def get_all_individual_statuses():
     """Get statuses for multiple individual reports in batch."""
     try:
@@ -835,6 +1006,7 @@ def get_all_individual_statuses():
 
 
 @app.route('/api/safety/block-media', methods=['POST'])
+@require_auth
 def block_media():
     """Block a media type."""
     try:
@@ -877,6 +1049,7 @@ def block_media():
 
 
 @app.route('/api/safety/unblock-media', methods=['POST'])
+@require_auth
 def unblock_media():
     """Unblock a media type."""
     try:
@@ -910,6 +1083,7 @@ def unblock_media():
 
 
 @app.route('/api/safety/blocked-media')
+@require_auth
 def get_blocked_media():
     """Get list of blocked media types."""
     try:
@@ -925,6 +1099,7 @@ def get_blocked_media():
 
 
 @app.route('/api/safety/bad-words')
+@require_auth
 def get_bad_words():
     """Get all bad words."""
     try:
@@ -940,6 +1115,7 @@ def get_bad_words():
 
 
 @app.route('/api/safety/bad-words/add', methods=['POST'])
+@require_auth
 def add_bad_word():
     """Add a bad word."""
     try:
@@ -973,6 +1149,7 @@ def add_bad_word():
 
 
 @app.route('/api/safety/bad-words/remove', methods=['POST'])
+@require_auth
 def remove_bad_word():
     """Remove a bad word."""
     try:
@@ -1006,6 +1183,7 @@ def remove_bad_word():
 
 
 @app.route('/api/safety/moderation-logs')
+@require_auth
 def get_moderation_logs():
     """Get moderation logs."""
     try:
@@ -1027,6 +1205,7 @@ def get_moderation_logs():
 # ============================================
 
 @app.route('/api/settings/bot')
+@require_auth
 def get_bot_settings():
     """Get bot configuration settings."""
     try:
@@ -1103,6 +1282,7 @@ Use /chat to find a new partner!"""
 
 
 @app.route('/api/settings/bot/update', methods=['POST'])
+@require_auth
 def update_bot_settings():
     """Update bot configuration settings."""
     try:
@@ -1173,6 +1353,7 @@ def update_bot_settings():
 
 
 @app.route('/api/settings/actions/force-logout', methods=['POST'])
+@require_auth
 def force_logout_all():
     """Force logout all users - disconnect all active chats and clear sessions."""
     try:
@@ -1244,6 +1425,7 @@ def force_logout_all():
 
 
 @app.route('/api/settings/actions/reset-queue', methods=['POST'])
+@require_auth
 def reset_queue():
     """Reset the entire matching queue."""
     try:
@@ -1299,6 +1481,7 @@ def reset_queue():
 # ============================================
 
 @app.route('/api/matching/settings', methods=['GET'])
+@require_auth
 def get_matching_settings():
     """Get current matching filter settings."""
     try:
@@ -1330,6 +1513,7 @@ def get_matching_settings():
 
 
 @app.route('/api/matching/settings', methods=['POST'])
+@require_auth
 def update_matching_settings():
     """Update matching filter settings."""
     try:
@@ -1371,6 +1555,7 @@ def update_matching_settings():
 
 
 @app.route('/api/matching/queue-size', methods=['GET'])
+@require_auth
 def get_queue_size():
     """Get current queue size."""
     try:
@@ -1390,6 +1575,7 @@ def get_queue_size():
 
 
 @app.route('/api/matching/force-match', methods=['POST'])
+@require_auth
 def force_match_users():
     """Force match two specific users (debug feature)."""
     try:

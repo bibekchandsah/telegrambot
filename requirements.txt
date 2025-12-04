@@ -6,3 +6,6 @@ structlog==24.1.0
 flask==3.0.0
 flask-cors==4.0.0
 nest-asyncio==1.6.0
+pyotp==2.9.0
+qrcode==7.4.2
+pillow==10.1.0
