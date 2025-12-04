@@ -207,6 +207,30 @@ class RedisClient:
         except RedisError as e:
             logger.error("redis_srem_error", key=key, error=str(e))
             raise
+    
+    async def zadd(self, key: str, mapping: dict, nx: bool = False, gt: bool = False) -> int:
+        """Add members to a sorted set with scores."""
+        try:
+            return await self.client.zadd(key, mapping, nx=nx, gt=gt)
+        except RedisError as e:
+            logger.error("redis_zadd_error", key=key, error=str(e))
+            raise
+    
+    async def zrevrange(self, key: str, start: int, end: int, withscores: bool = False) -> list:
+        """Get members from sorted set in reverse order (highest to lowest score)."""
+        try:
+            return await self.client.zrevrange(key, start, end, withscores=withscores)
+        except RedisError as e:
+            logger.error("redis_zrevrange_error", key=key, error=str(e))
+            raise
+    
+    async def zcard(self, key: str) -> int:
+        """Get the number of members in a sorted set."""
+        try:
+            return await self.client.zcard(key)
+        except RedisError as e:
+            logger.error("redis_zcard_error", key=key, error=str(e))
+            raise
 
 
 # Singleton instance

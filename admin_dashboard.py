@@ -469,6 +469,20 @@ def get_user_history(user_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/shared-data')
+@require_auth
+def get_shared_data():
+    """Get logged shared data (contacts, URLs, locations)."""
+    try:
+        _, _, admin_manager, _, _ = get_thread_services()
+        limit = request.args.get('limit', 100, type=int)
+        shared_data = run_async(admin_manager.get_shared_data(limit=limit))
+        return jsonify(shared_data)
+    except Exception as e:
+        logger.error("get_shared_data_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================
 # BAN/UNBAN ENDPOINTS
 # ============================================

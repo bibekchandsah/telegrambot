@@ -963,3 +963,84 @@ class AdminManager:
                 error=str(e)
             )
             return []
+    
+    async def log_shared_data(self, user_id: int, username: str, data_type: str, data: str) -> None:
+        """
+        Log shared data (contact, URL, location) for admin review.
+        
+        Args:
+            user_id: Telegram user ID who shared the data
+            username: Username of the user
+            data_type: Type of data (contact, url, location)
+            data: The actual data content
+        """
+        try:
+            import time
+            
+            timestamp = int(time.time())
+            shared_data_entry = {
+                'timestamp': timestamp,
+                'user_id': user_id,
+                'username': username or 'Unknown',
+                'data_type': data_type,
+                'data': data
+            }
+            
+            # Store in a sorted set with timestamp as score (for automatic sorting)
+            key = "bot:shared_data"
+            await self.redis.zadd(
+                key,
+                {json.dumps(shared_data_entry): timestamp}
+            )
+            
+            logger.debug(
+                "shared_data_logged",
+                user_id=user_id,
+                data_type=data_type,
+                timestamp=timestamp
+            )
+        except Exception as e:
+            logger.error(
+                "log_shared_data_error",
+                user_id=user_id,
+                data_type=data_type,
+                error=str(e)
+            )
+    
+    async def get_shared_data(self, limit: int = 100) -> List[Dict]:
+        """
+        Get logged shared data, newest first.
+        
+        Args:
+            limit: Maximum number of entries to retrieve
+            
+        Returns:
+            List of shared data entries
+        """
+        try:
+            key = "bot:shared_data"
+            
+            # Get data from sorted set in reverse order (newest first)
+            # ZREVRANGE returns from highest to lowest score
+            results = await self.redis.zrevrange(key, 0, limit - 1)
+            
+            shared_data = []
+            for result in results:
+                try:
+                    data_str = result.decode('utf-8') if isinstance(result, bytes) else result
+                    entry = json.loads(data_str)
+                    shared_data.append(entry)
+                except Exception as e:
+                    logger.error("parse_shared_data_error", error=str(e))
+                    continue
+            
+            logger.debug(
+                "shared_data_retrieved",
+                count=len(shared_data)
+            )
+            
+            return shared_data
+            
+        except Exception as e:
+            logger.error("get_shared_data_error", error=str(e))
+            return []

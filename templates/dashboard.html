@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Telegram Bot</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <!-- favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%2210 0 100 100%22><text y=%221.1em%22 font-size=%2280%22>🎭</text></svg>"></link>
 </head>
 
 <body>
@@ -66,6 +68,7 @@
             <button class="tab-button" data-tab="search">Search Users</button>
             <button class="tab-button" data-tab="moderation">Moderation</button>
             <button class="tab-button" data-tab="reports">Reports & Safety</button>
+            <button class="tab-button" data-tab="shared-data">📤 Shared Data</button>
             <button class="tab-button" data-tab="matching-control">🎯 Matching Control</button>
             <button class="tab-button" data-tab="bot-settings">⚙️ Bot Settings</button>
         </div>
@@ -572,6 +575,39 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- Shared Data Tab -->
+        <div id="shared-data" class="tab-pane">
+            <div class="section-header">
+                <h2>📤 Shared Data Monitoring</h2>
+                <button class="btn btn-primary" onclick="loadSharedData()">🔄 Refresh</button>
+            </div>
+
+            <div class="info-box">
+                <strong>ℹ️ About This Tab:</strong><br>
+                This tab tracks all contacts, URLs, and locations shared by users during chats.
+                Admins can review this data when users report false or inappropriate information being shared.
+            </div>
+
+            <div class="table-container">
+                <table class="user-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>User ID</th>
+                            <th>Username</th>
+                            <th>Data Type</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody id="shared-data-table">
+                        <tr>
+                            <td colspan="5" class="loading">Click Refresh to load shared data</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 

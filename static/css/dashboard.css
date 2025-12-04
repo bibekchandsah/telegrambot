@@ -1281,6 +1281,57 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+/* Badge Styles for Shared Data Types */
+.badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: white;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.badge-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.badge-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.badge-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.badge-info {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+.badge:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Info Box for Shared Data Tab */
+.info-box {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+    border-left: 4px solid var(--info-color);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    color: var(--text-secondary);
+    font-size: 0.95em;
+    line-height: 1.6;
+}
+
+.info-box strong {
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 8px;
+}
+
 /* Bad Word Badges */
 .bad-word-badge {
     display: inline-flex;

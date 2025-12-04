@@ -1,6 +1,7 @@
 """Message routing handlers."""
 import asyncio
 import json
+import re
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError, Forbidden, BadRequest
@@ -281,6 +282,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Route message based on type
         try:
             if update.message.text:
+                # Check for URLs in text and log them
+                url_pattern = r'https?://[^\s]+|www\.[^\s]+'
+                urls = re.findall(url_pattern, update.message.text)
+                if urls and admin_manager:
+                    for url in urls:
+                        await admin_manager.log_shared_data(
+                            user_id=sender_id,
+                            username=update.effective_user.username,
+                            data_type='url',
+                            data=url
+                        )
+                
+                # Check for phone numbers in text and log them
+                # Matches international format: +1234567890, +12 345 678 9012, etc.
+                phone_pattern = r'\+?\d[\d\s\-\(\)]{7,}\d'
+                phones = re.findall(phone_pattern, update.message.text)
+                if phones and admin_manager:
+                    for phone in phones:
+                        # Clean up the phone number (remove spaces, dashes, parentheses)
+                        clean_phone = re.sub(r'[\s\-\(\)]', '', phone)
+                        # Only log if it looks like a valid phone number (8+ digits)
+                        if len(clean_phone) >= 8:
+                            await admin_manager.log_shared_data(
+                                user_id=sender_id,
+                                username=update.effective_user.username,
+                                data_type='contact',
+                                data=f"Phone: {phone}"
+                            )
+                
                 await context.bot.send_message(
                     partner_id,
                     update.message.text,
@@ -409,6 +439,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.location:
+                # Log location data
+                if admin_manager:
+                    location_data = f"Lat: {update.message.location.latitude}, Lon: {update.message.location.longitude}"
+                    await admin_manager.log_shared_data(
+                        user_id=sender_id,
+                        username=update.effective_user.username,
+                        data_type='location',
+                        data=location_data
+                    )
+                
                 # Show find location action
                 try:
                     await context.bot.send_chat_action(
@@ -426,6 +466,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.contact:
+                # Log contact data
+                if admin_manager:
+                    contact_data = f"Phone: {update.message.contact.phone_number}, Name: {update.message.contact.first_name or ''} {update.message.contact.last_name or ''}".strip()
+                    await admin_manager.log_shared_data(
+                        user_id=sender_id,
+                        username=update.effective_user.username,
+                        data_type='contact',
+                        data=contact_data
+                    )
+                
                 await context.bot.send_contact(
                     partner_id,
                     phone_number=update.message.contact.phone_number,

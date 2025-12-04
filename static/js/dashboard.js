@@ -1407,6 +1407,65 @@ async function loadModerationLogs() {
 }
 
 // ============================================
+// SHARED DATA MONITORING
+// ============================================
+
+// Load shared data (contacts, URLs, locations)
+async function loadSharedData() {
+    const tbody = document.getElementById('shared-data-table');
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading shared data...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/shared-data?limit=100');
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+            tbody.innerHTML = '';
+            // Data is already sorted newest first from backend
+            data.forEach(entry => {
+                const row = document.createElement('tr');
+                const timestamp = formatTimestamp(entry.timestamp);
+                
+                // Badge color based on data type
+                let badgeClass = 'badge-info';
+                let icon = '📋';
+                if (entry.data_type === 'contact') {
+                    badgeClass = 'badge-warning';
+                    icon = '📞';
+                } else if (entry.data_type === 'url') {
+                    badgeClass = 'badge-primary';
+                    icon = '🔗';
+                } else if (entry.data_type === 'location') {
+                    badgeClass = 'badge-success';
+                    icon = '📍';
+                }
+                
+                row.innerHTML = `
+                    <td><span class="timestamp">${timestamp}</span></td>
+                    <td>${entry.user_id}</td>
+                    <td>${entry.username || 'Unknown'}</td>
+                    <td><span class="badge ${badgeClass}">${icon} ${entry.data_type.toUpperCase()}</span></td>
+                    <td style="font-size: 0.9em; word-break: break-all;">${escapeHtml(entry.data)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" class="no-data">No shared data logged yet</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading shared data:', error);
+        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error loading shared data</td></tr>';
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ============================================
 // BOT SETTINGS & CONFIGURATION
 // ============================================
 
