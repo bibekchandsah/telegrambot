@@ -152,6 +152,16 @@ async def post_init(application: Application):
         application.bot_data["admin_manager"] = admin_manager
         application.bot_data["report_manager"] = report_manager
         
+        # Initialize GitHub uploader
+        from src.services.github_uploader import GitHubUploader
+        github_uploader = GitHubUploader()
+        application.bot_data["github_uploader"] = github_uploader
+        
+        if github_uploader.is_configured():
+            logger.info("github_uploader_configured", repo=github_uploader.repo)
+        else:
+            logger.warning("github_uploader_not_configured", message="Media files will not be uploaded to GitHub")
+        
         logger.info("bot_initialized", bot_username=application.bot.username)
         
         # Log bot info

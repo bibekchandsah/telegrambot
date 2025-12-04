@@ -1309,6 +1309,10 @@ body {
     background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
+.badge-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
 .badge:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);

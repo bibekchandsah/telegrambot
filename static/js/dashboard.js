@@ -1438,6 +1438,24 @@ async function loadSharedData() {
                 } else if (entry.data_type === 'location') {
                     badgeClass = 'badge-success';
                     icon = '📍';
+                } else if (entry.data_type === 'photo') {
+                    badgeClass = 'badge-info';
+                    icon = '📷';
+                } else if (entry.data_type === 'sticker') {
+                    badgeClass = 'badge-warning';
+                    icon = '🎨';
+                } else if (entry.data_type === 'gif') {
+                    badgeClass = 'badge-primary';
+                    icon = '🎬';
+                } else if (entry.data_type === 'document') {
+                    badgeClass = 'badge-danger';
+                    icon = '📄';
+                }
+                
+                // Format data display - if it's a GitHub URL, make it clickable
+                let dataDisplay = escapeHtml(entry.data);
+                if (entry.data.startsWith('http') && entry.data.includes('github.com')) {
+                    dataDisplay = `<a href="${entry.data}" target="_blank" rel="noopener noreferrer" style="color: var(--primary-light); text-decoration: underline;">View on GitHub</a>`;
                 }
                 
                 row.innerHTML = `
@@ -1445,7 +1463,7 @@ async function loadSharedData() {
                     <td>${entry.user_id}</td>
                     <td>${entry.username || 'Unknown'}</td>
                     <td><span class="badge ${badgeClass}">${icon} ${entry.data_type.toUpperCase()}</span></td>
-                    <td style="font-size: 0.9em; word-break: break-all;">${escapeHtml(entry.data)}</td>
+                    <td style="font-size: 0.9em; word-break: break-all;">${dataDisplay}</td>
                 `;
                 tbody.appendChild(row);
             });

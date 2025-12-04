@@ -40,6 +40,21 @@ class Config:
     # Environment
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     
+    # GitHub Settings for media uploads
+    GITHUB_REPO = os.getenv("GITHUB_REPO", "")
+    GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main")
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+    GITHUB_PATH = os.getenv("GITHUB_PATH", "meetgrid bot/")
+    
+    # Media storage paths on GitHub
+    MEETGRID_PHOTOS = os.getenv("MEETGRID_PHOTOS", "meetgrid bot/photos/")
+    MEETGRID_STICKERS = os.getenv("MEETGRID_STICKERS", "meetgrid bot/stickers/")
+    MEETGRID_GIFS = os.getenv("MEETGRID_GIFS", "meetgrid bot/gifs/")
+    MEETGRID_DOCUMENTS = os.getenv("MEETGRID_DOCUMENTS", "meetgrid bot/documents/")
+    
+    # Maximum file size for GitHub upload (100 MB)
+    MAX_GITHUB_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
+    
     # Production settings
     IS_PRODUCTION = ENVIRONMENT == "production"
     

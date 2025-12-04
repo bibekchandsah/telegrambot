@@ -110,3 +110,7 @@ Google search: site:meetgrid.netlify.app
 📞 Contact: "Phone: +1234567890, Name: John Doe"
 🔗 URL: "https://example.com/profile"
 📍 Location: "Lat: 40.7128, Lon: -74.0060"
+
+photo, sticker, gif, documents
+{user_id}_{timestamp}_{filename}
+Example: 721000596_20251204_104930_photo_abc123.jpg

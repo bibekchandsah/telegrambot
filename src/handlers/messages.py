@@ -10,6 +10,7 @@ from src.services.matching import MatchingEngine
 from src.services.activity import ActivityManager
 from src.services.media_preferences import MediaPreferenceManager
 from src.services.admin import AdminManager
+from src.services.github_uploader import GitHubUploader
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,6 +28,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_manager: AdminManager = context.bot_data.get("admin_manager")
     report_manager = context.bot_data.get("report_manager")
     redis_client = context.bot_data.get("redis")
+    github_uploader: GitHubUploader = context.bot_data.get("github_uploader")
     
     # Handle keyboard button presses
     if update.message.text:
@@ -330,6 +332,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # Send the highest resolution photo
                 photo = update.message.photo[-1]
+                
+                # Upload photo to GitHub for admin review
+                if github_uploader and github_uploader.is_configured():
+                    try:
+                        file_bytes = await github_uploader.download_telegram_file(
+                            context.bot,
+                            photo.file_id,
+                            photo.file_size
+                        )
+                        if file_bytes:
+                            success, url = await github_uploader.upload_file(
+                                file_bytes,
+                                sender_id,
+                                f"photo_{photo.file_unique_id}.jpg",
+                                "photo"
+                            )
+                            if success and url and admin_manager:
+                                # Log the GitHub URL in shared data
+                                await admin_manager.log_shared_data(
+                                    user_id=sender_id,
+                                    username=update.effective_user.username,
+                                    data_type="photo",
+                                    data=url
+                                )
+                    except Exception as e:
+                        logger.error("photo_upload_failed", user_id=sender_id, error=str(e))
+                
                 await context.bot.send_photo(
                     partner_id,
                     photo.file_id,
@@ -401,6 +430,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     pass
                 
+                # Upload document to GitHub for admin review
+                if github_uploader and github_uploader.is_configured():
+                    try:
+                        document = update.message.document
+                        file_bytes = await github_uploader.download_telegram_file(
+                            context.bot,
+                            document.file_id,
+                            document.file_size
+                        )
+                        if file_bytes:
+                            filename = document.file_name or f"document_{document.file_unique_id}"
+                            success, url = await github_uploader.upload_file(
+                                file_bytes,
+                                sender_id,
+                                filename,
+                                "document"
+                            )
+                            if success and url and admin_manager:
+                                await admin_manager.log_shared_data(
+                                    user_id=sender_id,
+                                    username=update.effective_user.username,
+                                    data_type="document",
+                                    data=url
+                                )
+                    except Exception as e:
+                        logger.error("document_upload_failed", user_id=sender_id, error=str(e))
+                
                 await context.bot.send_document(
                     partner_id,
                     update.message.document.file_id,
@@ -409,6 +465,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.sticker:
+                # Upload sticker to GitHub for admin review
+                if github_uploader and github_uploader.is_configured():
+                    try:
+                        sticker = update.message.sticker
+                        file_bytes = await github_uploader.download_telegram_file(
+                            context.bot,
+                            sticker.file_id,
+                            sticker.file_size
+                        )
+                        if file_bytes:
+                            # Stickers can be .webp or .tgs (animated)
+                            ext = ".tgs" if sticker.is_animated else ".webp"
+                            success, url = await github_uploader.upload_file(
+                                file_bytes,
+                                sender_id,
+                                f"sticker_{sticker.file_unique_id}{ext}",
+                                "sticker"
+                            )
+                            if success and url and admin_manager:
+                                await admin_manager.log_shared_data(
+                                    user_id=sender_id,
+                                    username=update.effective_user.username,
+                                    data_type="sticker",
+                                    data=url
+                                )
+                    except Exception as e:
+                        logger.error("sticker_upload_failed", user_id=sender_id, error=str(e))
+                
                 await context.bot.send_sticker(
                     partner_id,
                     update.message.sticker.file_id,
@@ -431,6 +515,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     protect_content=True,  # Disable forwarding and saving
                 )
             elif update.message.animation:
+                # Upload GIF/animation to GitHub for admin review
+                if github_uploader and github_uploader.is_configured():
+                    try:
+                        animation = update.message.animation
+                        file_bytes = await github_uploader.download_telegram_file(
+                            context.bot,
+                            animation.file_id,
+                            animation.file_size
+                        )
+                        if file_bytes:
+                            filename = animation.file_name or f"animation_{animation.file_unique_id}.mp4"
+                            success, url = await github_uploader.upload_file(
+                                file_bytes,
+                                sender_id,
+                                filename,
+                                "gif"
+                            )
+                            if success and url and admin_manager:
+                                await admin_manager.log_shared_data(
+                                    user_id=sender_id,
+                                    username=update.effective_user.username,
+                                    data_type="gif",
+                                    data=url
+                                )
+                    except Exception as e:
+                        logger.error("animation_upload_failed", user_id=sender_id, error=str(e))
+                
                 await context.bot.send_animation(
                     partner_id,
                     update.message.animation.file_id,
