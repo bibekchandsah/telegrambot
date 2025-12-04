@@ -1383,8 +1383,8 @@ async function loadModerationLogs() {
             }
             
             tbody.innerHTML = '';
-            // Show most recent logs first
-            data.logs.reverse().forEach(log => {
+            // Logs already sorted by backend (newest first)
+            data.logs.forEach(log => {
                 const row = document.createElement('tr');
                 const timestamp = new Date(log.timestamp * 1000).toLocaleString();
                 

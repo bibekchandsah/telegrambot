@@ -791,7 +791,7 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(
             "⚠️ **Report Your Chat Partner**\n\n"
-            f"You are about to report User ID: `{partner_id}`\n\n"
+            f"You are about to report by your User ID: `{user_id}`\n\n"
             "Please select the reason for reporting:\n\n"
             "⚠️ **Important Notes:**\n"
             "• False reports may result in penalties\n"
@@ -897,7 +897,7 @@ async def report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.edit_message_text(
             f"✅ **Report Submitted**\n\n"
-            f"You have reported User ID: `{partner_id}`\n"
+            f"You are reporting by your User ID: `{user_id}`\n"
             f"Reason: **{flag_names[flag]}**\n\n"
             f"📋 Report #{new_count} for this user\n\n"
             f"Thank you for helping keep our community safe.\n"

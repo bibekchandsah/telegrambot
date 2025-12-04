@@ -598,15 +598,16 @@ class ReportManager:
     
     async def get_moderation_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
         """
-        Get recent moderation logs.
+        Get recent moderation logs (newest first).
         
         Args:
             limit: Maximum number of logs to retrieve
             
         Returns:
-            List of log entries
+            List of log entries (newest first, thanks to lpush storing newest at index 0)
         """
         try:
+            # lrange(0, limit-1) gets newest logs first because lpush adds to the left
             logs_bytes = await self.redis.lrange("bot:moderation_log", 0, limit - 1)
             logs = []
             
@@ -619,6 +620,7 @@ class ReportManager:
                 except:
                     continue
             
+            # No reverse needed - lpush keeps newest at index 0
             return logs
             
         except Exception as e:
