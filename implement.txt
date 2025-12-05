@@ -159,6 +159,10 @@ Profile contains:
     - /mode maintenance
 
 
+download the database data and allow admin to clean the database
+
+
+
 
 
 

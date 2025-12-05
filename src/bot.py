@@ -282,16 +282,19 @@ async def check_inactivity(context: ContextTypes.DEFAULT_TYPE):
                 user_inactive_time = current_time - user_last_activity
                 partner_inactive_time = current_time - partner_last_activity
                 
-                # Get the longest inactivity time (both users need to be inactive)
-                max_inactive_time = min(user_inactive_time, partner_inactive_time)
+                # Check if BOTH users have been inactive for the duration
+                # (We want to disconnect only when the whole chat is inactive)
+                both_inactive = user_inactive_time >= inactivity_duration and partner_inactive_time >= inactivity_duration
                 
-                if max_inactive_time >= inactivity_duration:
+                if both_inactive:
                     # Auto-disconnect due to inactivity
                     logger.info(
                         "auto_disconnect_inactivity",
                         user_id=user_id,
                         partner_id=partner_id,
-                        inactive_seconds=max_inactive_time
+                        user_inactive_seconds=user_inactive_time,
+                        partner_inactive_seconds=partner_inactive_time,
+                        threshold=inactivity_duration
                     )
                     
                     # End the chat
@@ -302,9 +305,10 @@ async def check_inactivity(context: ContextTypes.DEFAULT_TYPE):
                     await redis_client.delete(f"chat:activity:{partner_id}")
                     
                     # Notify both users
+                    minutes = inactivity_duration // 60
                     inactivity_msg = (
                         "⏱️ **Chat ended due to inactivity.**\n\n"
-                        f"No messages were exchanged for {inactivity_duration // 60} minutes.\n\n"
+                        f"No messages were exchanged for {minutes} minute{'s' if minutes != 1 else ''}.\n\n"
                         "Use /chat to find a new partner!"
                     )
                     
