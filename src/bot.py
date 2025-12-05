@@ -193,12 +193,16 @@ async def post_init(application: Application):
         
         # Start notification sender background job (if job_queue available)
         if application.job_queue:
+            logger.info("job_queue_available", message="Starting background jobs")
+            
             application.job_queue.run_repeating(
                 send_pending_notifications,
                 interval=5,  # Check every 5 seconds
                 first=1,
                 name="notification_sender"
             )
+            logger.info("notification_sender_started", interval=5)
+            
             # Start inactivity monitor
             application.job_queue.run_repeating(
                 check_inactivity,
@@ -206,8 +210,9 @@ async def post_init(application: Application):
                 first=10,
                 name="inactivity_monitor"
             )
+            logger.info("inactivity_monitor_started", interval=30)
         else:
-            logger.warning("job_queue_not_available", message="Install python-telegram-bot[job-queue] for background jobs")
+            logger.error("job_queue_not_available", message="Background jobs will NOT run! Install APScheduler or check dependencies")
         
     except Exception as e:
         logger.error("initialization_failed", error=str(e))
