@@ -334,7 +334,7 @@ def index():
 def get_stats():
     """Get dashboard statistics."""
     try:
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         stats = run_async(dashboard_service.get_statistics())
         return jsonify(stats)
     except Exception as e:
@@ -350,7 +350,7 @@ def get_users():
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 20))
         
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         users = run_async(dashboard_service.get_all_users_paginated(page, per_page))
         return jsonify(users)
     except Exception as e:
@@ -363,7 +363,7 @@ def get_users():
 def get_online_users():
     """Get currently online/active users."""
     try:
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         users = run_async(dashboard_service.get_online_users())
         return jsonify(users)
     except Exception as e:
@@ -376,7 +376,7 @@ def get_online_users():
 def get_users_in_chat():
     """Get users currently in chat."""
     try:
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         users = run_async(dashboard_service.get_users_in_chat())
         return jsonify(users)
     except Exception as e:
@@ -389,7 +389,7 @@ def get_users_in_chat():
 def get_users_in_queue():
     """Get users currently in queue."""
     try:
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         users = run_async(dashboard_service.get_users_in_queue())
         return jsonify(users)
     except Exception as e:
@@ -407,7 +407,7 @@ def search_users():
         gender = request.args.get('gender')
         country = request.args.get('country')
         
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         users = run_async(dashboard_service.search_users(
             user_id=user_id,
             username=username,
@@ -425,7 +425,7 @@ def search_users():
 def get_user_detail(user_id):
     """Get detailed user profile."""
     try:
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         user = run_async(dashboard_service.get_user_details(user_id))
         if user:
             return jsonify(user)
@@ -441,7 +441,7 @@ def get_user_detail(user_id):
 def get_user_history(user_id):
     """Get user chat history."""
     try:
-        _, dashboard_service, _, _, _ = get_thread_services()
+        _, dashboard_service, _, _, _, _ = get_thread_services()
         history = run_async(dashboard_service.get_user_chat_history(user_id))
         return jsonify(history)
     except Exception as e:
@@ -454,7 +454,7 @@ def get_user_history(user_id):
 def get_shared_data():
     """Get logged shared data (contacts, URLs, locations)."""
     try:
-        _, _, admin_manager, _, _ = get_thread_services()
+        _, _, admin_manager, _, _, _ = get_thread_services()
         limit = request.args.get('limit', 100, type=int)
         shared_data = run_async(admin_manager.get_shared_data(limit=limit))
         return jsonify(shared_data)
@@ -484,7 +484,7 @@ def ban_user():
         # Convert duration string to seconds
         duration_seconds = parse_duration(duration_str)
         
-        _, _, admin_manager, _, bot = get_thread_services()
+        _, _, admin_manager, _, _, bot = get_thread_services()
         success = run_async(admin_manager.ban_user(
             user_id=int(user_id),
             banned_by=int(admin_id),
@@ -521,7 +521,7 @@ def unban_user():
         if not user_id:
             return jsonify({"error": "user_id is required"}), 400
         
-        _, _, admin_manager, _, bot = get_thread_services()
+        _, _, admin_manager, _, _, bot = get_thread_services()
         success = run_async(admin_manager.unban_user(
             user_id=int(user_id),
             unbanned_by=int(admin_id)
@@ -556,7 +556,7 @@ def warn_user():
         if not user_id or not reason:
             return jsonify({"error": "user_id and reason are required"}), 400
         
-        _, _, admin_manager, _, bot = get_thread_services()
+        _, _, admin_manager, _, _, bot = get_thread_services()
         warning_count = run_async(admin_manager.add_warning(
             user_id=int(user_id),
             warned_by=int(admin_id),
@@ -583,7 +583,7 @@ def warn_user():
 def check_ban(user_id):
     """Check if user is banned."""
     try:
-        _, _, admin_manager, _, _ = get_thread_services()
+        _, _, admin_manager, _, _, _ = get_thread_services()
         is_banned, ban_data = run_async(admin_manager.is_user_banned(user_id))
         
         if is_banned and ban_data:
@@ -614,7 +614,7 @@ def check_ban(user_id):
 def get_banned_users():
     """Get list of all banned users."""
     try:
-        _, _, admin_manager, _, _ = get_thread_services()
+        _, _, admin_manager, _, _, _ = get_thread_services()
         banned_user_ids = run_async(admin_manager.get_banned_users_list())
         
         # Get detailed info for each banned user
@@ -649,7 +649,7 @@ def get_banned_users():
 def get_warned_users():
     """Get list of all warned users."""
     try:
-        _, _, admin_manager, _, _ = get_thread_services()
+        _, _, admin_manager, _, _, _ = get_thread_services()
         warned_user_ids = run_async(admin_manager.get_warning_list())
         
         # Get warning counts
@@ -681,7 +681,7 @@ def get_all_reports():
     """Get all user reports."""
     try:
         limit = request.args.get('limit', 100, type=int)
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         reports = run_async(report_manager.get_all_reports(limit=limit))
         
         return jsonify({
@@ -699,7 +699,7 @@ def get_all_reports():
 def get_user_reports(user_id):
     """Get reports for a specific user."""
     try:
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         report_data = run_async(report_manager.get_report_by_user(user_id))
         
         if report_data:
@@ -729,7 +729,7 @@ def approve_report():
         if not user_id:
             return jsonify({"error": "user_id is required"}), 400
         
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         success = run_async(report_manager.approve_report(int(user_id), admin_id))
         
         if success:
@@ -765,7 +765,7 @@ def reject_report():
         if not user_id:
             return jsonify({"error": "user_id is required"}), 400
         
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         success = run_async(report_manager.reject_report(int(user_id), admin_id, reason))
         
         if success:
@@ -793,7 +793,7 @@ def reject_report():
 def get_report_stats():
     """Get report statistics."""
     try:
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         stats = run_async(report_manager.get_report_stats())
         return jsonify({
             "success": True,
@@ -818,7 +818,7 @@ def approve_individual_report():
         if not all([reported_user_id, reporter_id, timestamp]):
             return jsonify({"error": "reported_user_id, reporter_id, and timestamp are required"}), 400
         
-        redis_client, _, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
         
         # Remove rejection if exists (allow status change)
         rejection_key = f"report:individual_rejection:{reported_user_id}:{reporter_id}:{timestamp}"
@@ -868,7 +868,7 @@ def reject_individual_report():
         if not all([reported_user_id, reporter_id, timestamp]):
             return jsonify({"error": "reported_user_id, reporter_id, and timestamp are required"}), 400
         
-        redis_client, _, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
         
         # Remove approval if exists (allow status change)
         approval_key = f"report:individual_approval:{reported_user_id}:{reporter_id}:{timestamp}"
@@ -916,7 +916,7 @@ def get_individual_report_status():
         if not all([reported_user_id, reporter_id, timestamp]):
             return jsonify({"error": "Missing parameters"}), 400
         
-        redis_client, _, _, _, _ = get_thread_services()
+        redis_client, _, _, _, _, _ = get_thread_services()
         
         # Check approval
         approval_key = f"report:individual_approval:{reported_user_id}:{reporter_id}:{timestamp}"
@@ -947,7 +947,7 @@ def get_all_individual_statuses():
         if not reports:
             return jsonify({"success": True, "statuses": []})
         
-        redis_client, _, _, _, _ = get_thread_services()
+        redis_client, _, _, _, _, _ = get_thread_services()
         statuses = []
         
         for report in reports:
@@ -1016,7 +1016,7 @@ def block_media():
         # Convert duration
         duration_seconds = parse_duration(duration_str)
         
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         success = run_async(report_manager.block_media_type(
             media_type=media_type,
             duration=duration_seconds,
@@ -1054,7 +1054,7 @@ def unblock_media():
         if not media_type:
             return jsonify({"error": "media_type is required"}), 400
         
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         success = run_async(report_manager.unblock_media_type(media_type))
         
         if success:
@@ -1081,7 +1081,7 @@ def unblock_media():
 def get_blocked_media():
     """Get list of blocked media types."""
     try:
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         blocked_media = run_async(report_manager.get_blocked_media_types())
         return jsonify({
             "total": len(blocked_media),
@@ -1097,7 +1097,7 @@ def get_blocked_media():
 def get_bad_words():
     """Get all bad words."""
     try:
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         bad_words = run_async(report_manager.get_bad_words())
         return jsonify({
             "total": len(bad_words),
@@ -1120,7 +1120,7 @@ def add_bad_word():
         if not word:
             return jsonify({"error": "word is required"}), 400
         
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         success = run_async(report_manager.add_bad_word(word, admin_id))
         
         if success:
@@ -1154,7 +1154,7 @@ def remove_bad_word():
         if not word:
             return jsonify({"error": "word is required"}), 400
         
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         success = run_async(report_manager.remove_bad_word(word, admin_id))
         
         if success:
@@ -1182,7 +1182,7 @@ def get_moderation_logs():
     """Get moderation logs."""
     try:
         limit = request.args.get('limit', 100, type=int)
-        _, _, _, report_manager, _ = get_thread_services()
+        _, _, _, report_manager, _, _ = get_thread_services()
         logs = run_async(report_manager.get_moderation_logs(limit=limit))
         
         return jsonify({
@@ -1203,7 +1203,7 @@ def get_moderation_logs():
 def get_bot_settings():
     """Get bot configuration settings."""
     try:
-        redis_client, _, _, _, _ = get_thread_services()
+        redis_client, _, _, _, _, _ = get_thread_services()
         
         # Define default messages
         default_welcome = """👋 Welcome to Anonymous Random Chat, {first_name}!
@@ -1283,7 +1283,7 @@ def update_bot_settings():
         data = request.get_json()
         admin_id = parse_admin_id(data.get('admin_id'))
         
-        redis_client, _, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
         
         updates = []
         
@@ -1354,7 +1354,7 @@ def force_logout_all():
         data = request.get_json()
         admin_id = parse_admin_id(data.get('admin_id'))
         
-        redis_client, _, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
         
         # Get all active chat pairs
         pair_keys = run_async(redis_client.keys("pair:*"))
@@ -1426,7 +1426,7 @@ def reset_queue():
         data = request.get_json()
         admin_id = parse_admin_id(data.get('admin_id'))
         
-        redis_client, _, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
         
         # Get all users from the queue:waiting list
         queue_users = run_async(redis_client.lrange("queue:waiting", 0, -1))
@@ -1479,7 +1479,7 @@ def reset_queue():
 def get_matching_settings():
     """Get current matching filter settings."""
     try:
-        redis_client, _, _, _, _ = get_thread_services()
+        redis_client, _, _, _, _, _ = get_thread_services()
         
         # Get filter settings (default to enabled)
         gender_filter = run_async(redis_client.get("matching:gender_filter_enabled"))
@@ -1514,7 +1514,7 @@ def update_matching_settings():
         data = request.get_json()
         admin_id = parse_admin_id(data.get('admin_id'))
         
-        redis_client, _, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
         
         updates = []
         
@@ -1553,7 +1553,7 @@ def update_matching_settings():
 def get_queue_size():
     """Get current queue size."""
     try:
-        redis_client, _, _, _, _ = get_thread_services()
+        redis_client, _, _, _, _, _ = get_thread_services()
         
         # Get queue list length
         queue_size = run_async(redis_client.llen("queue:waiting"))
@@ -1581,7 +1581,7 @@ def force_match_users():
         if user1_id == user2_id:
             return jsonify({"error": "Cannot match a user with themselves"}), 400
         
-        redis_client, _, _, report_manager, _ = get_thread_services()
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
         
         # Check if users exist and their states
         user1_state = run_async(redis_client.get(f"state:{user1_id}"))
