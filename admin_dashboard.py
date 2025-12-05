@@ -18,6 +18,7 @@ from src.db.redis_client import RedisClient
 from src.services.dashboard import DashboardService
 from src.services.admin import AdminManager
 from src.services.reports import ReportManager
+from src.services.backup import BackupService
 from src.utils.logger import get_logger
 from threading import local
 
@@ -85,30 +86,9 @@ def get_thread_services():
             dashboard = DashboardService(client)
             admin = AdminManager(client, admin_ids)
             reports = ReportManager(client)
+            backup = BackupService(client)
             telegram_bot = Bot(token=bot_token)
-            return client, dashboard, admin, reports, telegram_bot
-        
-        # Run in new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        thread_local.services = loop.run_until_complete(create_services())
-        thread_local.loop = loop
-    
-    return thread_local.services
-
-
-def get_thread_services():
-    """Get or create services for current thread."""
-    if not hasattr(thread_local, 'services'):
-        # Create new services for this thread
-        async def create_services():
-            client = RedisClient()
-            await client.connect()
-            dashboard = DashboardService(client)
-            admin = AdminManager(client, admin_ids)
-            reports = ReportManager(client)
-            telegram_bot = Bot(token=bot_token)
-            return client, dashboard, admin, reports, telegram_bot
+            return client, dashboard, admin, reports, backup, telegram_bot
         
         # Run in new event loop
         loop = asyncio.new_event_loop()
@@ -1701,6 +1681,204 @@ def force_match_users():
         return jsonify({"error": "Invalid user ID format"}), 400
     except Exception as e:
         logger.error("force_match_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/create', methods=['POST'])
+@require_auth
+def create_backup():
+    """Create a new Redis backup."""
+    try:
+        data = request.get_json() or {}
+        compress = data.get('compress', True)
+        
+        client, dashboard, admin, reports, backup, bot = get_thread_services()
+        
+        async def run():
+            return await backup.create_backup(compress=compress)
+        
+        result = thread_local.loop.run_until_complete(run())
+        
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error("create_backup_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/list')
+@require_auth
+def list_backups():
+    """List all available backups."""
+    try:
+        client, dashboard, admin, reports, backup, bot = get_thread_services()
+        
+        async def run():
+            return await backup.list_backups()
+        
+        backups = thread_local.loop.run_until_complete(run())
+        return jsonify({"backups": backups}), 200
+            
+    except Exception as e:
+        logger.error("list_backups_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/download/<filename>')
+@require_auth
+def download_backup(filename):
+    """Download a backup file."""
+    try:
+        from flask import send_file
+        import os
+        
+        # Security: validate filename
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        backup_path = os.path.join('backups', filename)
+        
+        if not os.path.exists(backup_path):
+            return jsonify({"error": "Backup file not found"}), 404
+        
+        return send_file(
+            backup_path,
+            as_attachment=True,
+            download_name=filename
+        )
+            
+    except Exception as e:
+        logger.error("download_backup_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/restore', methods=['POST'])
+@require_auth
+def restore_backup():
+    """Restore Redis data from a backup."""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        overwrite = data.get('overwrite', False)
+        
+        if not filename:
+            return jsonify({"error": "Filename is required"}), 400
+        
+        # Security: validate filename
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        client, dashboard, admin, reports, backup, bot = get_thread_services()
+        
+        async def run():
+            return await backup.restore_backup(filename, overwrite=overwrite)
+        
+        result = thread_local.loop.run_until_complete(run())
+        
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error("restore_backup_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/delete/<filename>', methods=['DELETE'])
+@require_auth
+def delete_backup(filename):
+    """Delete a backup file."""
+    try:
+        # Security: validate filename
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        client, dashboard, admin, reports, backup, bot = get_thread_services()
+        
+        async def run():
+            return await backup.delete_backup(filename)
+        
+        result = thread_local.loop.run_until_complete(run())
+        
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 404
+            
+    except Exception as e:
+        logger.error("delete_backup_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/stats')
+@require_auth
+def backup_stats():
+    """Get backup statistics."""
+    try:
+        client, dashboard, admin, reports, backup, bot = get_thread_services()
+        
+        async def run():
+            return await backup.get_backup_stats()
+        
+        stats = thread_local.loop.run_until_complete(run())
+        return jsonify(stats), 200
+            
+    except Exception as e:
+        logger.error("backup_stats_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/github/list')
+@require_auth
+def list_github_backups():
+    """List all backups from both local and GitHub storage."""
+    try:
+        client, dashboard, admin, reports, backup, bot = get_thread_services()
+        
+        async def run():
+            return await backup.list_all_backups()
+        
+        result = thread_local.loop.run_until_complete(run())
+        return jsonify(result), 200
+            
+    except Exception as e:
+        logger.error("list_github_backups_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/backup/github/download', methods=['POST'])
+@require_auth
+def download_from_github():
+    """Download a backup from GitHub to local storage."""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        
+        if not filename:
+            return jsonify({"error": "Filename is required"}), 400
+        
+        # Security: validate filename
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        client, dashboard, admin, reports, backup, bot = get_thread_services()
+        
+        async def run():
+            return await backup.download_from_github(filename)
+        
+        result = thread_local.loop.run_until_complete(run())
+        
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error("download_from_github_error", error=str(e))
         return jsonify({"error": str(e)}), 500
 
 

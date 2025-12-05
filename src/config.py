@@ -51,6 +51,7 @@ class Config:
     MEETGRID_STICKERS = os.getenv("MEETGRID_STICKERS", "meetgrid bot/stickers/")
     MEETGRID_GIFS = os.getenv("MEETGRID_GIFS", "meetgrid bot/gifs/")
     MEETGRID_DOCUMENTS = os.getenv("MEETGRID_DOCUMENTS", "meetgrid bot/documents/")
+    MEETGRID_BACKUPS = os.getenv("MEETGRID_BACKUPS", "meetgrid bot/backups/")
     
     # Maximum file size for GitHub upload (100 MB)
     MAX_GITHUB_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes

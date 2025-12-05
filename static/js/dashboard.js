@@ -75,6 +75,9 @@ function loadTabData(tab) {
         case 'matching-control':
             loadMatchingSettings();
             break;
+        case 'backups':
+            loadBackups();
+            break;
     }
 }
 
@@ -1862,5 +1865,340 @@ function formatTimestamp(timestamp) {
         return '<span style="color: #94a3b8;">N/A</span>';
     }
 }
+
+// ==========================================
+// Backup Management Functions
+// ==========================================
+
+// Load backups tab data
+async function loadBackups() {
+    try {
+        // Load backup stats
+        const statsResponse = await fetch('/api/backup/stats');
+        if (statsResponse.ok) {
+            const stats = await statsResponse.json();
+            
+            document.getElementById('backup-total-count').textContent = stats.total_backups || 0;
+            document.getElementById('backup-total-size').textContent = `${stats.total_size_mb || 0} MB`;
+            
+            if (stats.github_enabled) {
+                const githubCount = stats.github_backups_count || 0;
+                document.getElementById('backup-total-count').textContent = 
+                    `${stats.total_backups || 0} local, ${githubCount} GitHub`;
+            }
+            
+            if (stats.latest_backup) {
+                const latestDate = new Date(stats.latest_backup.created_at);
+                const diffMins = Math.floor((new Date() - latestDate) / 60000);
+                
+                let timeAgo = '';
+                if (diffMins < 60) {
+                    timeAgo = `${diffMins}m ago`;
+                } else if (diffMins < 1440) {
+                    timeAgo = `${Math.floor(diffMins / 60)}h ago`;
+                } else {
+                    timeAgo = `${Math.floor(diffMins / 1440)}d ago`;
+                }
+                
+                document.getElementById('backup-latest-time').textContent = timeAgo;
+            } else {
+                document.getElementById('backup-latest-time').textContent = 'Never';
+            }
+        }
+        
+        // Load all backups (local + GitHub)
+        loadGitHubBackups();
+    } catch (error) {
+        console.error('Error loading backups:', error);
+        showNotification('Error loading backups: ' + error.message, 'error');
+    }
+}
+
+// Display backups in table
+function displayBackups(backups) {
+    const tableBody = document.getElementById('backups-table');
+    
+    if (backups.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No backups found. Create your first backup!</td></tr>';
+        return;
+    }
+    
+    tableBody.innerHTML = backups.map(backup => {
+        const createdDate = new Date(backup.created_at);
+        const formattedDate = createdDate.toLocaleString();
+        
+        return `
+            <tr>
+                <td>${formattedDate}</td>
+                <td><code style="font-size: 0.85em;">${backup.filename}</code></td>
+                <td>${backup.size_mb} MB</td>
+                <td>${backup.compressed ? '✅ Yes' : '❌ No'}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="downloadBackup('${backup.filename}')" title="Download">
+                        ⬇️ Download
+                    </button>
+                    <button class="btn-warning btn-sm" onclick="confirmRestore('${backup.filename}')" title="Restore">
+                        🔄 Restore
+                    </button>
+                    <button class="btn-danger btn-sm" onclick="confirmDeleteBackup('${backup.filename}')" title="Delete">
+                        🗑️ Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Create new backup
+async function createBackup() {
+    const compress = document.getElementById('backup-compress').checked;
+    
+    if (!confirm('Create a new backup now?\n\nThis will backup all Redis data including users, chats, queues, and settings.')) {
+        return;
+    }
+    
+    try {
+        showNotification('Creating backup... Please wait.', 'info');
+        
+        const response = await fetch('/api/backup/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ compress })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            let message = `✅ Backup created successfully!\n\n` +
+                `Filename: ${result.filename}\n` +
+                `Size: ${result.size_mb} MB\n` +
+                `Keys: ${result.keys_count}`;
+            
+            if (result.github_storage) {
+                message += `\n☁️ Uploaded to GitHub: Yes`;
+            } else if (result.github_url === null && result.github_storage === false) {
+                message += `\n📁 Local storage only`;
+            }
+            
+            showNotification(message, 'success');
+            loadBackups(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to create backup');
+        }
+    } catch (error) {
+        console.error('Error creating backup:', error);
+        showNotification('Error creating backup: ' + error.message, 'error');
+    }
+}
+
+// Download backup
+function downloadBackup(filename) {
+    window.location.href = `/api/backup/download/${filename}`;
+    showNotification(`Downloading ${filename}...`, 'info');
+}
+
+// Confirm and restore backup
+function confirmRestore(filename) {
+    const overwrite = confirm(
+        `Restore from backup: ${filename}\n\n` +
+        `⚠️ IMPORTANT:\n` +
+        `Click OK to OVERWRITE existing data\n` +
+        `Click Cancel to skip existing keys (safer)`
+    );
+    
+    const confirmRestore = confirm(
+        `You selected: ${overwrite ? 'OVERWRITE mode' : 'SKIP mode'}\n\n` +
+        `Are you sure you want to proceed with restore?`
+    );
+    
+    if (confirmRestore) {
+        restoreBackup(filename, overwrite);
+    }
+}
+
+// Restore backup
+async function restoreBackup(filename, overwrite) {
+    try {
+        showNotification('Restoring backup... Please wait.', 'info');
+        
+        const response = await fetch('/api/backup/restore', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filename, overwrite })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Backup restored successfully!\n\n` +
+                `Restored: ${result.restored_count} keys\n` +
+                `Skipped: ${result.skipped_count} keys\n` +
+                `Errors: ${result.error_count} keys`,
+                'success'
+            );
+            
+            // Refresh stats
+            loadStats();
+        } else {
+            throw new Error(result.error || 'Failed to restore backup');
+        }
+    } catch (error) {
+        console.error('Error restoring backup:', error);
+        showNotification('Error restoring backup: ' + error.message, 'error');
+    }
+}
+
+// Confirm and delete backup
+function confirmDeleteBackup(filename) {
+    if (confirm(`Delete backup: ${filename}\n\nThis action cannot be undone!`)) {
+        deleteBackup(filename);
+    }
+}
+
+// Delete backup
+async function deleteBackup(filename) {
+    try {
+        const response = await fetch(`/api/backup/delete/${filename}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(`✅ Backup deleted: ${filename}`, 'success');
+            loadBackups(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to delete backup');
+        }
+    } catch (error) {
+        console.error('Error deleting backup:', error);
+        showNotification('Error deleting backup: ' + error.message, 'error');
+    }
+}
+
+// Load GitHub backups
+async function loadGitHubBackups() {
+    try {
+        const response = await fetch('/api/backup/github/list');
+        if (response.ok) {
+            const data = await response.json();
+            displayAllBackups(data);
+        } else {
+            throw new Error('Failed to load GitHub backups');
+        }
+    } catch (error) {
+        console.error('Error loading GitHub backups:', error);
+        showNotification('Error loading GitHub backups: ' + error.message, 'error');
+    }
+}
+
+// Display all backups (local + GitHub)
+function displayAllBackups(data) {
+    const tableBody = document.getElementById('backups-table');
+    const local = data.local || [];
+    const github = data.github || [];
+    
+    if (local.length === 0 && github.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No backups found. Create your first backup!</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    
+    // Local backups
+    local.forEach(backup => {
+        const createdDate = new Date(backup.created_at);
+        const formattedDate = createdDate.toLocaleString();
+        
+        html += `
+            <tr>
+                <td>${formattedDate}</td>
+                <td><code style="font-size: 0.85em;">${backup.filename}</code></td>
+                <td>${backup.size_mb} MB</td>
+                <td>${backup.compressed ? '✅ Yes' : '❌ No'}</td>
+                <td>📁 Local</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="downloadBackup('${backup.filename}')" title="Download">
+                        ⬇️ Download
+                    </button>
+                    <button class="btn-warning btn-sm" onclick="confirmRestore('${backup.filename}')" title="Restore">
+                        🔄 Restore
+                    </button>
+                    <button class="btn-danger btn-sm" onclick="confirmDeleteBackup('${backup.filename}')" title="Delete">
+                        🗑️ Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    // GitHub backups
+    if (data.github_enabled) {
+        github.forEach(backup => {
+            html += `
+                <tr style="background-color: rgba(59, 130, 246, 0.05);">
+                    <td>-</td>
+                    <td><code style="font-size: 0.85em;">${backup.filename}</code></td>
+                    <td>${backup.size_mb} MB</td>
+                    <td>-</td>
+                    <td>☁️ GitHub</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="window.open('${backup.url}', '_blank')" title="View on GitHub">
+                            🔗 View
+                        </button>
+                        <button class="btn-success btn-sm" onclick="downloadFromGitHub('${backup.filename}')" title="Download to Local">
+                            ⬇️ Get
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    tableBody.innerHTML = html;
+}
+
+// Download backup from GitHub to local storage
+async function downloadFromGitHub(filename) {
+    if (!confirm(`Download ${filename} from GitHub to local storage?`)) {
+        return;
+    }
+    
+    try {
+        showNotification('Downloading from GitHub... Please wait.', 'info');
+        
+        const response = await fetch('/api/backup/github/download', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filename })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Downloaded from GitHub!\n\n` +
+                `Filename: ${result.filename}\n` +
+                `Size: ${result.size_mb} MB`,
+                'success'
+            );
+            loadGitHubBackups(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to download from GitHub');
+        }
+    } catch (error) {
+        console.error('Error downloading from GitHub:', error);
+        showNotification('Error downloading from GitHub: ' + error.message, 'error');
+    }
+}
+
+
 
 

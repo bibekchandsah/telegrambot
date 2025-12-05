@@ -71,6 +71,7 @@
             <button class="tab-button" data-tab="shared-data">📤 Shared Data</button>
             <button class="tab-button" data-tab="matching-control">🎯 Matching Control</button>
             <button class="tab-button" data-tab="bot-settings">⚙️ Bot Settings</button>
+            <button class="tab-button" data-tab="backups">💾 Backups</button>
         </div>
 
         <!-- Tab Content -->
@@ -802,6 +803,107 @@
                             Removes all users from the matching queue
                         </small>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backups Tab -->
+        <div id="backups" class="tab-pane">
+            <div class="section-header">
+                <h2>💾 Redis Backup Management</h2>
+                <button class="btn btn-primary" onclick="loadBackups()">🔄 Refresh</button>
+            </div>
+
+            <!-- Backup Statistics -->
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="backup-total-count">-</div>
+                        <div class="stat-label">Total Backups</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💽</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="backup-total-size">-</div>
+                        <div class="stat-label">Total Size</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🕒</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="backup-latest-time">-</div>
+                        <div class="stat-label">Latest Backup</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Backup Section -->
+            <div class="moderation-section">
+                <h4 style="margin-top: 0;">🆕 Create New Backup</h4>
+                <div style="display: flex; align-items: center; gap: 15px; margin: 15px 0;">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="backup-compress" checked>
+                        <span>Compress backup (recommended)</span>
+                    </label>
+                </div>
+                <button class="btn-success" onclick="createBackup()">
+                    💾 Create Backup Now
+                </button>
+                <p style="color: var(--text-secondary); margin-top: 10px; font-size: 0.9em;">
+                    Creates a complete backup of all Redis data including users, chats, queues, bans, reports, and settings.
+                </p>
+            </div>
+
+            <!-- Available Backups -->
+            <div class="moderation-section">
+                <h4 style="margin-top: 0;">📂 Available Backups</h4>
+                <div class="table-container">
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>Created At</th>
+                                <th>Filename</th>
+                                <th>Size</th>
+                                <th>Compressed</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="backups-table">
+                            <tr>
+                                <td colspan="5" class="loading">Loading backups...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Backup Information -->
+            <div class="moderation-section">
+                <h4 style="margin-top: 0;">ℹ️ Backup Information</h4>
+                <div style="color: var(--text-secondary); line-height: 1.8;">
+                    <p><strong>What gets backed up:</strong></p>
+                    <ul style="margin: 10px 0;">
+                        <li>✅ All user profiles and preferences</li>
+                        <li>✅ Chat histories and matches</li>
+                        <li>✅ Queue data</li>
+                        <li>✅ Ban records and warnings</li>
+                        <li>✅ Reports and moderation data</li>
+                        <li>✅ All bot settings and configurations</li>
+                    </ul>
+                    <p><strong>Backup Tips:</strong></p>
+                    <ul style="margin: 10px 0;">
+                        <li>🔒 Download important backups and store them safely</li>
+                        <li>⏰ Schedule automatic backups (see BACKUP_SYSTEM.md)</li>
+                        <li>💾 Keep at least 7 days of backups</li>
+                        <li>🗜️ Use compression to save disk space</li>
+                        <li>✅ Test restore process regularly</li>
+                    </ul>
+                    <p style="margin-top: 15px;">
+                        <strong>For automated backups and detailed instructions, see:</strong><br>
+                        <code>BACKUP_SYSTEM.md</code> and <code>BACKUP_QUICKSTART.md</code>
+                    </p>
                 </div>
             </div>
         </div>
