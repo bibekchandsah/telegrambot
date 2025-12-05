@@ -75,6 +75,9 @@ function loadTabData(tab) {
         case 'matching-control':
             loadMatchingSettings();
             break;
+        case 'data-management':
+            loadDataStats();
+            break;
         case 'backups':
             loadBackups();
             break;
@@ -737,6 +740,9 @@ async function loadBannedUsers() {
                             <button class="btn btn-success btn-small" onclick="quickUnban(${ban.user_id})">
                                 Unban
                             </button>
+                            <button class="btn btn-danger btn-small" onclick="deleteSingleBan(${ban.user_id})" title="Delete ban record">
+                                🗑️ Delete
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -768,6 +774,9 @@ async function loadWarnedUsers() {
                         <td>
                             <button class="btn btn-primary btn-small" onclick="viewUser(${user.user_id})">
                                 View Details
+                            </button>
+                            <button class="btn btn-danger btn-small" onclick="deleteSingleWarning(${user.user_id})" title="Delete warning record">
+                                🗑️ Delete
                             </button>
                         </td>
                     </tr>
@@ -810,6 +819,148 @@ async function quickUnban(userId) {
     } catch (error) {
         console.error('Error unbanning user:', error);
         alert('Error unbanning user. Please try again.');
+    }
+}
+
+// Delete single ban record
+async function deleteSingleBan(userId) {
+    if (!confirm(`Delete ban record for user ${userId}?\n\nThis will remove the ban record but keep other user data.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/delete-single-ban', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                admin_id: 0
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(`✅ Ban record deleted for user ${userId}`, 'success');
+            loadBannedUsers(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to delete ban record');
+        }
+    } catch (error) {
+        console.error('Error deleting ban record:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete single warning record
+async function deleteSingleWarning(userId) {
+    if (!confirm(`Delete warning record for user ${userId}?\n\nThis will remove all warnings for this user.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/delete-single-warning', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                admin_id: 0
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(`✅ Warning record deleted for user ${userId}`, 'success');
+            loadWarnedUsers(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to delete warning record');
+        }
+    } catch (error) {
+        console.error('Error deleting warning record:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete entire banned users list
+async function deleteBannedUsersList() {
+    if (!confirm('⚠️ WARNING: This will remove ALL banned users from the ban list!\n\nAll ban records will be deleted permanently.\n\nAre you sure you want to continue?')) {
+        return;
+    }
+    
+    if (!confirm('Final confirmation: Clear the entire banned users list?')) {
+        return;
+    }
+    
+    try {
+        showNotification('Deleting all banned users... Please wait.', 'info');
+        
+        const response = await fetch('/api/data/delete-banned-users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ admin_id: 0 })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Banned users list cleared!\n\n` +
+                `Users removed from ban list: ${result.deleted_count}`,
+                'success'
+            );
+            loadBannedUsers(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to delete banned users list');
+        }
+    } catch (error) {
+        console.error('Error deleting banned users list:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete entire warned users list
+async function deleteWarnedUsersList() {
+    if (!confirm('⚠️ WARNING: This will remove ALL warned users from the warnings list!\n\nAll warning records will be deleted permanently.\n\nAre you sure you want to continue?')) {
+        return;
+    }
+    
+    if (!confirm('Final confirmation: Clear the entire warned users list?')) {
+        return;
+    }
+    
+    try {
+        showNotification('Deleting all warned users... Please wait.', 'info');
+        
+        const response = await fetch('/api/data/delete-warned-users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ admin_id: 0 })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Warned users list cleared!\n\n` +
+                `Users removed from warnings: ${result.deleted_count}`,
+                'success'
+            );
+            loadWarnedUsers(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to delete warned users list');
+        }
+    } catch (error) {
+        console.error('Error deleting warned users list:', error);
+        showNotification('Error: ' + error.message, 'error');
     }
 }
 
@@ -1416,7 +1567,7 @@ async function loadModerationLogs() {
 // Load shared data (contacts, URLs, locations)
 async function loadSharedData() {
     const tbody = document.getElementById('shared-data-table');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading shared data...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading shared data...</td></tr>';
     
     try {
         const response = await fetch('/api/shared-data?limit=100');
@@ -1461,21 +1612,29 @@ async function loadSharedData() {
                     dataDisplay = `<a href="${entry.data}" target="_blank" rel="noopener noreferrer" style="color: var(--primary-light); text-decoration: underline;">View on GitHub</a>`;
                 }
                 
+                // Create delete button with entry data
+                const entryData = JSON.stringify(entry).replace(/"/g, '&quot;');
+                
                 row.innerHTML = `
                     <td><span class="timestamp">${timestamp}</span></td>
                     <td>${entry.user_id}</td>
                     <td>${entry.username || 'Unknown'}</td>
                     <td><span class="badge ${badgeClass}">${icon} ${entry.data_type.toUpperCase()}</span></td>
                     <td style="font-size: 0.9em; word-break: break-all;">${dataDisplay}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick='deleteSharedData(${entryData})' title="Delete this entry">
+                            🗑️ Delete
+                        </button>
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" class="no-data">No shared data logged yet</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No shared data logged yet</td></tr>';
         }
     } catch (error) {
         console.error('Error loading shared data:', error);
-        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Error loading shared data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">Error loading shared data</td></tr>';
     }
 }
 
@@ -1484,6 +1643,46 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Delete shared data entry
+async function deleteSharedData(entry) {
+    const dataTypeLabel = entry.data_type.toUpperCase();
+    const username = entry.username || 'Unknown';
+    const dataPreview = entry.data.length > 50 ? entry.data.substring(0, 50) + '...' : entry.data;
+    
+    if (!confirm(`Delete this shared data entry?\n\nUser: ${username} (${entry.user_id})\nType: ${dataTypeLabel}\nData: ${dataPreview}\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/shared-data/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                timestamp: entry.timestamp,
+                user_id: entry.user_id,
+                username: entry.username,
+                data_type: entry.data_type,
+                data: entry.data,
+                admin_id: 0
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification('✅ Shared data entry deleted successfully', 'success');
+            loadSharedData(); // Refresh the list
+        } else {
+            throw new Error(result.error || 'Failed to delete shared data entry');
+        }
+    } catch (error) {
+        console.error('Error deleting shared data:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
 }
 
 // ============================================
@@ -2198,6 +2397,507 @@ async function downloadFromGitHub(filename) {
         showNotification('Error downloading from GitHub: ' + error.message, 'error');
     }
 }
+
+// ============================================
+// DATA MANAGEMENT FUNCTIONS
+// ============================================
+
+// Load data statistics
+async function loadDataStats() {
+    try {
+        const response = await fetch('/api/data/stats');
+        const result = await response.json();
+        
+        if (result.success) {
+            const stats = result.stats;
+            const statsDiv = document.getElementById('data-stats');
+            
+            statsDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div class="stat-box">
+                        <div class="stat-label">👥 Users</div>
+                        <div class="stat-value">${stats.users}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">📝 Profiles</div>
+                        <div class="stat-value">${stats.profiles}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">🎯 Preferences</div>
+                        <div class="stat-value">${stats.preferences}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">💬 Active Chats</div>
+                        <div class="stat-value">${stats.active_chats}</div>
+                        <small style="color: var(--text-secondary); font-size: 0.75em;">Ongoing conversations</small>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">📋 Reports</div>
+                        <div class="stat-value">${stats.reports}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">🚫 Bans</div>
+                        <div class="stat-value">${stats.bans}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">⚠️ Warnings</div>
+                        <div class="stat-value">${stats.warnings}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">⭐ Ratings</div>
+                        <div class="stat-value">${stats.ratings}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">💭 Feedbacks</div>
+                        <div class="stat-value">${stats.feedbacks}</div>
+                        <small style="color: var(--text-secondary); font-size: 0.75em;">Recent (1hr)</small>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">🟢 Online Users</div>
+                        <div class="stat-value">${stats.online_users}</div>
+                        <small style="color: var(--text-secondary); font-size: 0.75em;">Active now</small>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">⌨️ Typing</div>
+                        <div class="stat-value">${stats.typing_users}</div>
+                        <small style="color: var(--text-secondary); font-size: 0.75em;">Currently typing</small>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">⏳ Queue Size</div>
+                        <div class="stat-value">${stats.queue_size}</div>
+                    </div>
+                    <div class="stat-box" style="grid-column: span 2;">
+                        <div class="stat-label">🔑 Total Keys</div>
+                        <div class="stat-value" style="font-size: 1.8em; color: var(--primary);">${stats.total_keys}</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            throw new Error(result.error || 'Failed to load stats');
+        }
+    } catch (error) {
+        console.error('Error loading data stats:', error);
+        showNotification('Error loading statistics: ' + error.message, 'error');
+    }
+}
+
+// Delete user data
+async function deleteUserData() {
+    const userId = document.getElementById('delete-user-id').value;
+    
+    if (!userId) {
+        showNotification('Please enter a user ID', 'error');
+        return;
+    }
+    
+    if (!confirm(`⚠️ WARNING: This will permanently delete ALL data for user ${userId}!\n\nThis includes:\n- Profile\n- Preferences\n- Chat history\n- Ratings\n- Reports\n- Bans/Warnings\n\nThis action CANNOT be undone!\n\nAre you sure?`)) {
+        return;
+    }
+    
+    if (!confirm(`Final confirmation: Delete all data for user ${userId}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/delete-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                user_id: userId,
+                admin_id: 0 
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ User data deleted successfully!\n\n` +
+                `User ID: ${userId}\n` +
+                `Keys deleted: ${result.count}`,
+                'success'
+            );
+            document.getElementById('delete-user-id').value = '';
+            loadDataStats(); // Refresh stats
+        } else {
+            throw new Error(result.error || 'Failed to delete user data');
+        }
+    } catch (error) {
+        console.error('Error deleting user data:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete chat history
+async function deleteChatHistory() {
+    const userId = document.getElementById('delete-history-user-id').value;
+    
+    if (!userId) {
+        showNotification('Please enter a user ID', 'error');
+        return;
+    }
+    
+    if (!confirm(`Delete chat history for user ${userId}?\n\nNote: Profile and other data will be kept.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/delete-chat-history', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                user_id: userId,
+                admin_id: 0 
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(`✅ Chat history deleted for user ${userId}`, 'success');
+            document.getElementById('delete-history-user-id').value = '';
+        } else {
+            throw new Error(result.error || 'Failed to delete chat history');
+        }
+    } catch (error) {
+        console.error('Error deleting chat history:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete old reports
+async function deleteOldReports() {
+    const days = document.getElementById('delete-reports-days').value || 30;
+    
+    if (!confirm(`Delete all reports older than ${days} days?`)) {
+        return;
+    }
+    
+    try {
+        showNotification('Deleting old reports... Please wait.', 'info');
+        
+        const response = await fetch('/api/data/delete-reports', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                days: parseInt(days),
+                admin_id: 0 
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Old reports deleted!\n\n` +
+                `Reports deleted: ${result.deleted_count}\n` +
+                `Older than: ${days} days`,
+                'success'
+            );
+            loadDataStats(); // Refresh stats
+        } else {
+            throw new Error(result.error || 'Failed to delete old reports');
+        }
+    } catch (error) {
+        console.error('Error deleting old reports:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete inactive users
+async function deleteInactiveUsers() {
+    const days = document.getElementById('delete-inactive-days').value || 90;
+    
+    if (!confirm(`⚠️ WARNING: This will permanently delete ALL data for users inactive for ${days}+ days!\n\nThis action CANNOT be undone!\n\nAre you sure?`)) {
+        return;
+    }
+    
+    if (!confirm(`Final confirmation: Delete all inactive users (${days}+ days)?`)) {
+        return;
+    }
+    
+    try {
+        showNotification('Deleting inactive users... This may take a while.', 'info');
+        
+        const response = await fetch('/api/data/delete-inactive-users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                days: parseInt(days),
+                admin_id: 0 
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Inactive users deleted!\n\n` +
+                `Users deleted: ${result.deleted_count}\n` +
+                `Inactive for: ${days}+ days`,
+                'success'
+            );
+            loadDataStats(); // Refresh stats
+        } else {
+            throw new Error(result.error || 'Failed to delete inactive users');
+        }
+    } catch (error) {
+        console.error('Error deleting inactive users:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Clear cache
+async function clearCache() {
+    if (!confirm('Clear temporary cache data?\n\nThis will clear activity timestamps and sessions.\n\nSafe operation - no user data will be lost.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/clear-cache', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ admin_id: 0 })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Cache cleared!\n\n` +
+                `Entries deleted: ${result.deleted_count}`,
+                'success'
+            );
+            loadDataStats(); // Refresh stats
+        } else {
+            throw new Error(result.error || 'Failed to clear cache');
+        }
+    } catch (error) {
+        console.error('Error clearing cache:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete all reports
+async function deleteAllReports() {
+    if (!confirm('⚠️ WARNING: Delete ALL User Reports?\n\nThis will permanently delete ALL user reports from the database!\n\nThis action CANNOT be undone!\n\nMake sure you have a backup before proceeding.')) {
+        return;
+    }
+    
+    // Double confirmation
+    if (!confirm('Are you absolutely sure? This will delete ALL reports!')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/delete-all-reports', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ admin_id: 0 })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ All reports deleted!\n\n` +
+                `Reports deleted: ${result.deleted_count}`,
+                'success'
+            );
+            loadDataStats();
+            loadReportStats(); // Refresh reports tab if on that page
+        } else {
+            throw new Error(result.error || 'Failed to delete all reports');
+        }
+    } catch (error) {
+        console.error('Error deleting all reports:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete single report
+async function deleteSingleReport() {
+    const userIdInput = document.getElementById('delete-report-user-id');
+    const userId = userIdInput.value.trim();
+    
+    if (!userId) {
+        showNotification('Please enter a user ID', 'warning');
+        return;
+    }
+    
+    if (!confirm(`Delete report for user ${userId}?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/delete-single-report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                user_id: userId,
+                admin_id: 0 
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(`✅ ${result.message}`, 'success');
+            userIdInput.value = '';
+            loadDataStats();
+            loadReportStats();
+        } else {
+            throw new Error(result.error || 'Failed to delete report');
+        }
+    } catch (error) {
+        console.error('Error deleting report:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Clear blocked media
+async function clearBlockedMedia() {
+    if (!confirm('⚠️ Clear ALL Blocked Media Types?\n\nThis will remove all media type restrictions!\n\nUsers will be able to send all media types until you set restrictions again.\n\nContinue?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/clear-blocked-media', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ admin_id: 0 })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Blocked media cleared!\n\n` +
+                `Media types removed: ${result.deleted_count}`,
+                'success'
+            );
+            loadDataStats();
+        } else {
+            throw new Error(result.error || 'Failed to clear blocked media');
+        }
+    } catch (error) {
+        console.error('Error clearing blocked media:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Clear bad words
+async function clearBadWords() {
+    if (!confirm('⚠️ Clear ALL Bad Words?\n\nThis will disable bad word filtering until new words are added!\n\nUsers will be able to use any words until you rebuild the list.\n\nContinue?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/data/clear-bad-words', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ admin_id: 0 })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Bad words cleared!\n\n` +
+                `Words removed: ${result.deleted_count}`,
+                'success'
+            );
+            loadDataStats();
+        } else {
+            throw new Error(result.error || 'Failed to clear bad words');
+        }
+    } catch (error) {
+        console.error('Error clearing bad words:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+// Clear moderation logs
+async function clearModerationLogs() {
+    const daysInput = document.getElementById('clear-logs-days');
+    const daysToKeep = parseInt(daysInput.value) || 0;
+    
+    let confirmMsg;
+    if (daysToKeep > 0) {
+        confirmMsg = `⚠️ Clear Moderation Logs Older Than ${daysToKeep} Days?\n\n` +
+                    `This will delete your audit trail for actions older than ${daysToKeep} days.\n\n` +
+                    `Make sure you have a backup before proceeding!\n\n` +
+                    `Continue?`;
+    } else {
+        confirmMsg = `⚠️ WARNING: Delete ALL Moderation Logs?\n\n` +
+                    `This will PERMANENTLY delete your ENTIRE audit trail!\n\n` +
+                    `You will lose ALL records of moderation actions!\n\n` +
+                    `Make sure you have a backup before proceeding!\n\n` +
+                    `Are you absolutely sure?`;
+    }
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    // Double confirmation for deleting all
+    if (daysToKeep === 0) {
+        if (!confirm('Final confirmation: Delete ALL moderation logs? This CANNOT be undone!')) {
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/data/clear-moderation-logs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                admin_id: 0,
+                days_to_keep: daysToKeep
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(
+                `✅ Moderation logs cleared!\n\n` +
+                `Logs deleted: ${result.deleted_count}`,
+                'success'
+            );
+            loadDataStats();
+        } else {
+            throw new Error(result.error || 'Failed to clear moderation logs');
+        }
+    } catch (error) {
+        console.error('Error clearing moderation logs:', error);
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+
+
+
 
 
 

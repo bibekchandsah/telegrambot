@@ -71,6 +71,7 @@
             <button class="tab-button" data-tab="shared-data">📤 Shared Data</button>
             <button class="tab-button" data-tab="matching-control">🎯 Matching Control</button>
             <button class="tab-button" data-tab="bot-settings">⚙️ Bot Settings</button>
+            <button class="tab-button" data-tab="data-management">🗑️ Data Management</button>
             <button class="tab-button" data-tab="backups">💾 Backups</button>
         </div>
 
@@ -339,7 +340,10 @@
             <div class="moderation-section">
                 <div class="section-header">
                     <h3>Banned Users List</h3>
-                    <button class="btn btn-primary" onclick="loadBannedUsers()">🔄 Refresh</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" onclick="loadBannedUsers()">🔄 Refresh</button>
+                        <button class="btn btn-danger" onclick="deleteBannedUsersList()">🗑️ Clear All Bans</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table class="user-table">
@@ -367,7 +371,10 @@
             <div class="moderation-section">
                 <div class="section-header">
                     <h3>Warned Users List</h3>
-                    <button class="btn btn-primary" onclick="loadWarnedUsers()">🔄 Refresh</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" onclick="loadWarnedUsers()">🔄 Refresh</button>
+                        <button class="btn btn-danger" onclick="deleteWarnedUsersList()">🗑️ Clear All Warnings</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table class="user-table">
@@ -601,11 +608,12 @@
                             <th>Username</th>
                             <th>Data Type</th>
                             <th>Data</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="shared-data-table">
                         <tr>
-                            <td colspan="5" class="loading">Click Refresh to load shared data</td>
+                            <td colspan="6" class="loading">Click Refresh to load shared data</td>
                         </tr>
                     </tbody>
                 </table>
@@ -907,6 +915,176 @@
                 </div>
             </div>
         </div>
+
+        <!-- Data Management Tab -->
+        <div id="data-management" class="tab-pane">
+            <div class="section-header">
+                <h2>🗑️ Data Management</h2>
+                <p style="color: var(--text-secondary); margin-top: 10px;">Manage and clean up Redis database data</p>
+            </div>
+
+            <!-- Data Statistics -->
+            <div class="moderation-section">
+                <h3>📊 Database Statistics</h3>
+                <button class="btn btn-primary" onclick="loadDataStats()">🔄 Refresh Stats</button>
+                <div id="data-stats" style="margin-top: 20px;">
+                    <p class="loading">Click refresh to load statistics...</p>
+                </div>
+            </div>
+
+            <!-- Delete Specific User Data -->
+            <div class="moderation-section">
+                <h3>👤 Delete User Data</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Delete all data for a specific user (profile, preferences, chat history, etc.)
+                </p>
+                <div class="form-group">
+                    <label>User ID:</label>
+                    <input type="number" id="delete-user-id" placeholder="Enter user ID" class="form-input">
+                </div>
+                <button class="btn btn-danger" onclick="deleteUserData()">🗑️ Delete User Data</button>
+                <p style="color: var(--warning); font-size: 0.9em; margin-top: 10px;">
+                    ⚠️ Warning: This action cannot be undone!
+                </p>
+            </div>
+
+            <!-- Delete Chat History -->
+            <div class="moderation-section">
+                <h3>💬 Delete Chat History</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Delete only the chat history for a specific user (keeps profile and other data)
+                </p>
+                <div class="form-group">
+                    <label>User ID:</label>
+                    <input type="number" id="delete-history-user-id" placeholder="Enter user ID" class="form-input">
+                </div>
+                <button class="btn btn-warning" onclick="deleteChatHistory()">🗑️ Delete Chat History</button>
+            </div>
+
+            <!-- Delete Reports -->
+            <div class="moderation-section">
+                <h3>📋 Manage Reports</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Delete individual user reports or clear all reports
+                </p>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: var(--text-primary); margin-bottom: 10px;">Delete Individual Report</h4>
+                    <div class="form-group">
+                        <label>User ID:</label>
+                        <input type="number" id="delete-report-user-id" placeholder="Enter user ID" class="form-input">
+                    </div>
+                    <button class="btn btn-warning" onclick="deleteSingleReport()">🗑️ Delete This Report</button>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: var(--text-primary); margin-bottom: 10px;">Delete Old Reports</h4>
+                    <div class="form-group">
+                        <label>Days (delete older than):</label>
+                        <input type="number" id="delete-reports-days" value="30" min="1" class="form-input">
+                    </div>
+                    <button class="btn btn-warning" onclick="deleteOldReports()">🗑️ Delete Old Reports</button>
+                </div>
+                
+                <div style="background: var(--warning-bg); padding: 15px; border-radius: 8px; border-left: 4px solid var(--error);">
+                    <h4 style="color: var(--error); margin-top: 0;">⚠️ Danger Zone</h4>
+                    <p style="color: var(--text-secondary); margin-bottom: 10px;">
+                        Delete ALL user reports (cannot be undone)
+                    </p>
+                    <button class="btn btn-danger" onclick="deleteAllReports()">🗑️ Delete ALL Reports</button>
+                </div>
+            </div>
+
+            <!-- Delete Inactive Users -->
+            <div class="moderation-section">
+                <h3>😴 Delete Inactive Users</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Delete all data for users who haven't been active for X days
+                </p>
+                <div class="form-group">
+                    <label>Days (default: 90):</label>
+                    <input type="number" id="delete-inactive-days" value="90" min="30" class="form-input">
+                </div>
+                <button class="btn btn-danger" onclick="deleteInactiveUsers()">🗑️ Delete Inactive Users</button>
+                <p style="color: var(--warning); font-size: 0.9em; margin-top: 10px;">
+                    ⚠️ Warning: This will permanently delete data for ALL inactive users!
+                </p>
+            </div>
+
+            <!-- Clear Cache -->
+            <div class="moderation-section">
+                <h3>🧹 Clear Cache</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Clear temporary cache data (activity timestamps, sessions)
+                </p>
+                <button class="btn btn-primary" onclick="clearCache()">🧹 Clear Cache</button>
+                <p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 10px;">
+                    ✅ Safe operation - only clears temporary data
+                </p>
+            </div>
+
+            <!-- Clear Blocked Media -->
+            <div class="moderation-section">
+                <h3>🚫 Clear Blocked Media Types</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Clear all blocked media types (photos, videos, etc.)
+                </p>
+                <button class="btn btn-danger" onclick="clearBlockedMedia()">🗑️ Clear Blocked Media</button>
+                <p style="color: var(--warning); font-size: 0.9em; margin-top: 10px;">
+                    ⚠️ This will remove all media type restrictions!
+                </p>
+            </div>
+
+            <!-- Clear Bad Words -->
+            <div class="moderation-section">
+                <h3>🔤 Clear Bad Words List</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Clear all bad words from the content filter
+                </p>
+                <button class="btn btn-danger" onclick="clearBadWords()">🗑️ Clear Bad Words</button>
+                <p style="color: var(--warning); font-size: 0.9em; margin-top: 10px;">
+                    ⚠️ This will disable bad word filtering until new words are added!
+                </p>
+            </div>
+
+            <!-- Clear Moderation Logs -->
+            <div class="moderation-section">
+                <h3>📜 Clear Moderation Logs</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Clear moderation action logs (audit trail)
+                </p>
+                <div class="form-group">
+                    <label>Days to Keep (0 = delete all):</label>
+                    <input type="number" id="clear-logs-days" value="0" min="0" class="form-input">
+                    <p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 5px;">
+                        Set to 0 to delete all logs, or specify days to keep recent logs
+                    </p>
+                </div>
+                <button class="btn btn-danger" onclick="clearModerationLogs()">🗑️ Clear Logs</button>
+                <p style="color: var(--error); font-size: 0.9em; margin-top: 10px;">
+                    ⚠️ <strong>Warning:</strong> This will delete your audit trail! Make sure to backup first.
+                </p>
+            </div>
+
+            <!-- Safety Notice -->
+            <div class="moderation-section" style="background: var(--warning-bg); border-left: 4px solid var(--warning);">
+                <h4 style="margin-top: 0; color: var(--warning);">⚠️ Important Safety Notice</h4>
+                <div style="color: var(--text-secondary); line-height: 1.8;">
+                    <ul style="margin: 10px 0;">
+                        <li>🔴 <strong>Always create a backup before deleting data!</strong></li>
+                        <li>📋 Most deletion operations are irreversible</li>
+                        <li>✅ Test on development environment first</li>
+                        <li>📊 Check data statistics before bulk deletions</li>
+                        <li>🔍 Verify user IDs before individual deletions</li>
+                        <li>💾 Keep backups for at least 30 days after deletion</li>
+                    </ul>
+                    <p style="margin-top: 15px;">
+                        <strong>Best Practice:</strong> Create a backup in the "💾 Backups" tab before performing any data deletion operations.
+                    </p>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- User Detail Modal -->

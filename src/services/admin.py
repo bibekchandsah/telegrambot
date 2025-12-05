@@ -1044,3 +1044,61 @@ class AdminManager:
         except Exception as e:
             logger.error("get_shared_data_error", error=str(e))
             return []
+
+    async def delete_shared_data(self, timestamp: int, user_id: int, username: str, 
+                                 data_type: str, data: str) -> bool:
+        """
+        Delete a specific shared data entry.
+        
+        Args:
+            timestamp: Timestamp of the entry
+            user_id: User ID who shared the data
+            username: Username of the user
+            data_type: Type of data (contact, url, location, etc.)
+            data: The actual data content
+            
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        try:
+            key = "bot:shared_data"
+            
+            # Reconstruct the exact entry to delete
+            shared_data_entry = {
+                'timestamp': timestamp,
+                'user_id': user_id,
+                'username': username or 'Unknown',
+                'data_type': data_type,
+                'data': data
+            }
+            
+            # Remove from sorted set
+            entry_json = json.dumps(shared_data_entry)
+            removed = await self.redis.zrem(key, entry_json)
+            
+            if removed > 0:
+                logger.info(
+                    "shared_data_deleted",
+                    user_id=user_id,
+                    data_type=data_type,
+                    timestamp=timestamp
+                )
+                return True
+            else:
+                logger.warning(
+                    "shared_data_not_found",
+                    user_id=user_id,
+                    data_type=data_type,
+                    timestamp=timestamp
+                )
+                return False
+            
+        except Exception as e:
+            logger.error(
+                "delete_shared_data_error",
+                user_id=user_id,
+                data_type=data_type,
+                error=str(e)
+            )
+            return False
+

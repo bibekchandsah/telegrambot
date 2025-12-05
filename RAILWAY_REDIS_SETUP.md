@@ -4,7 +4,7 @@
 
 Your current Redis URL:
 ```
-redis://default:ffszhttFptGyvkVAqChdBvOmdfsdfpgbFrwTc@telegram-bot-redis.railway.internal:6379/0
+redis://default:ffszhttFptGyvkVkdjlksfjAqChdBvOmdfsdfpgbFrwTc@telegram-bot-redis.railway.internal:6379/0
 ```
 
 **This URL uses Railway's internal network** (`.railway.internal` domain), which is **ONLY accessible between services within your Railway project**. You cannot connect to it from localhost.
@@ -74,7 +74,7 @@ Create separate environment files:
 
 ### `.env.local` (for local development)
 ```env
-BOT_TOKEN=8242472786:AAEnijLQSEHyzU3SFR7Hja274QvqUL8wKuY
+BOT_TOKEN=82424727fffff86:AAEnijLQSEHyzUfff3SFR7Hja274QvqUL8wKuY
 REDIS_URL=redis://localhost:6379/0
 ENVIRONMENT=development
 ADMIN_IDS=721000596,6005806073

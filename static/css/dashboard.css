@@ -1670,6 +1670,44 @@ input:focus + .toggle-slider {
     }
 }
 
+/* Responsive for Mobile Devices (425px and below) */
+@media (max-width: 425px) {
+    /* Database Statistics - Make stat boxes stack vertically */
+    #data-stats > div {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+    
+    .stat-box {
+        padding: 15px;
+        min-width: 100%;
+    }
+    
+    .stat-box .stat-label {
+        font-size: 0.85em;
+    }
+    
+    .stat-box .stat-value {
+        font-size: 1.5em;
+    }
+    
+    /* Make form inputs full width */
+    .form-input {
+        max-width: 100%;
+    }
+    
+    /* Adjust moderation sections */
+    .moderation-section {
+        padding: 15px;
+    }
+    
+    /* Stack buttons vertically on very small screens */
+    .btn {
+        width: 100%;
+        padding: 10px;
+    }
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 10px;
@@ -1705,4 +1743,62 @@ input:focus + .toggle-slider {
 
 button, .btn, .tab-button, .page-btn {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Data Management Stat Boxes */
+.stat-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stat-box:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--glow-primary);
+    transform: translateY(-2px);
+}
+
+.stat-box .stat-label {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.stat-box .stat-value {
+    color: var(--text-primary);
+    font-size: 1.8em;
+    font-weight: 700;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.form-input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px 15px;
+    background: var(--dark-bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 1em;
+    transition: all 0.3s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }

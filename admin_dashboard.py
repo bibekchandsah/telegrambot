@@ -463,6 +463,54 @@ def get_shared_data():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/shared-data/delete', methods=['POST'])
+@require_auth
+def delete_shared_data():
+    """Delete a specific shared data entry."""
+    try:
+        data = request.get_json()
+        timestamp = data.get('timestamp')
+        user_id = data.get('user_id')
+        username = data.get('username')
+        data_type = data.get('data_type')
+        data_content = data.get('data')
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        if not all([timestamp, user_id, data_type, data_content]):
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        _, _, admin_manager, report_manager, _, _ = get_thread_services()
+        
+        success = run_async(admin_manager.delete_shared_data(
+            timestamp=timestamp,
+            user_id=user_id,
+            username=username,
+            data_type=data_type,
+            data=data_content
+        ))
+        
+        if success:
+            # Log the action
+            if report_manager:
+                run_async(report_manager.log_moderation_action(
+                    admin_id=admin_id,
+                    action="shared_data_deleted",
+                    target_user_id=user_id,
+                    details=f"Deleted {data_type} shared by {username or user_id}"
+                ))
+            
+            return jsonify({
+                "success": True,
+                "message": "Shared data entry deleted successfully"
+            })
+        else:
+            return jsonify({"error": "Failed to delete shared data entry"}), 500
+            
+    except Exception as e:
+        logger.error("delete_shared_data_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================
 # BAN/UNBAN ENDPOINTS
 # ============================================
@@ -1879,6 +1927,751 @@ def download_from_github():
             
     except Exception as e:
         logger.error("download_from_github_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# DATA MANAGEMENT ENDPOINTS
+# ============================================
+
+@app.route('/api/data/delete-user', methods=['POST'])
+@require_auth
+def delete_user_data():
+    """Delete all data for a specific user."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        user_id = int(user_id)
+        deleted_keys = []
+        
+        # Delete user profile
+        profile_key = f"user:{user_id}"
+        if run_async(redis_client.exists(profile_key)):
+            run_async(redis_client.delete(profile_key))
+            deleted_keys.append(profile_key)
+        
+        # Delete user state
+        state_key = f"state:{user_id}"
+        if run_async(redis_client.exists(state_key)):
+            run_async(redis_client.delete(state_key))
+            deleted_keys.append(state_key)
+        
+        # Delete user preferences
+        pref_key = f"preferences:{user_id}"
+        if run_async(redis_client.exists(pref_key)):
+            run_async(redis_client.delete(pref_key))
+            deleted_keys.append(pref_key)
+        
+        # Delete media preferences
+        media_pref_key = f"media_preferences:{user_id}"
+        if run_async(redis_client.exists(media_pref_key)):
+            run_async(redis_client.delete(media_pref_key))
+            deleted_keys.append(media_pref_key)
+        
+        # Delete user pair (if in chat)
+        pair_key = f"pair:{user_id}"
+        if run_async(redis_client.exists(pair_key)):
+            run_async(redis_client.delete(pair_key))
+            deleted_keys.append(pair_key)
+        
+        # Delete chat activity
+        activity_key = f"chat:activity:{user_id}"
+        if run_async(redis_client.exists(activity_key)):
+            run_async(redis_client.delete(activity_key))
+            deleted_keys.append(activity_key)
+        
+        # Delete user rating
+        rating_key = f"rating:{user_id}"
+        if run_async(redis_client.exists(rating_key)):
+            run_async(redis_client.delete(rating_key))
+            deleted_keys.append(rating_key)
+        
+        # Delete user feedback
+        feedback_key = f"feedback:{user_id}"
+        if run_async(redis_client.exists(feedback_key)):
+            run_async(redis_client.delete(feedback_key))
+            deleted_keys.append(feedback_key)
+        
+        # Remove from queue if present
+        run_async(redis_client.lrem("queue:waiting", 0, user_id))
+        
+        # Delete ban data
+        ban_key = f"ban:{user_id}"
+        if run_async(redis_client.exists(ban_key)):
+            run_async(redis_client.delete(ban_key))
+            deleted_keys.append(ban_key)
+        
+        # Delete warnings
+        warning_key = f"warnings:{user_id}"
+        if run_async(redis_client.exists(warning_key)):
+            run_async(redis_client.delete(warning_key))
+            deleted_keys.append(warning_key)
+        
+        # Delete reports
+        report_key = f"report:{user_id}"
+        if run_async(redis_client.exists(report_key)):
+            run_async(redis_client.delete(report_key))
+            deleted_keys.append(report_key)
+        
+        # Remove from banned users list
+        run_async(redis_client.srem("banned_users", user_id))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="user_data_deleted",
+                target_user_id=user_id,
+                details=f"Deleted {len(deleted_keys)} data keys for user {user_id}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"All data for user {user_id} has been deleted",
+            "deleted_keys": deleted_keys,
+            "count": len(deleted_keys)
+        })
+        
+    except Exception as e:
+        logger.error("delete_user_data_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-chat-history', methods=['POST'])
+@require_auth
+def delete_chat_history():
+    """Delete chat history for a specific user."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        user_id = int(user_id)
+        
+        # Delete chat history
+        history_key = f"chat:history:{user_id}"
+        deleted = run_async(redis_client.delete(history_key))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="chat_history_deleted",
+                target_user_id=user_id,
+                details=f"Deleted chat history for user {user_id}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Chat history deleted for user {user_id}",
+            "deleted": bool(deleted)
+        })
+        
+    except Exception as e:
+        logger.error("delete_chat_history_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-reports', methods=['POST'])
+@require_auth
+def delete_old_reports():
+    """Delete old or resolved reports."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        days = data.get('days', 30)  # Delete reports older than X days
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get all report keys
+        report_keys = run_async(redis_client.keys("report:*"))
+        deleted_count = 0
+        current_time = int(time.time())
+        cutoff_time = current_time - (days * 86400)  # days to seconds
+        
+        for key in report_keys:
+            if isinstance(key, bytes):
+                key = key.decode('utf-8')
+            
+            # Skip individual report status keys
+            if "approval" in key or "rejection" in key:
+                continue
+            
+            report_data = run_async(redis_client.get(key))
+            if report_data:
+                try:
+                    report = json.loads(report_data.decode('utf-8') if isinstance(report_data, bytes) else report_data)
+                    # Check if report is old
+                    if report.get('timestamp', current_time) < cutoff_time:
+                        run_async(redis_client.delete(key))
+                        deleted_count += 1
+                except:
+                    continue
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="old_reports_deleted",
+                details=f"Deleted {deleted_count} reports older than {days} days"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Deleted {deleted_count} old reports",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("delete_old_reports_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-inactive-users', methods=['POST'])
+@require_auth
+def delete_inactive_users():
+    """Delete data for users who haven't been active for X days."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        days = data.get('days', 90)  # Delete users inactive for 90+ days
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get all user keys
+        user_keys = run_async(redis_client.keys("user:*"))
+        deleted_users = []
+        current_time = int(time.time())
+        cutoff_time = current_time - (days * 86400)
+        
+        for key in user_keys:
+            if isinstance(key, bytes):
+                key = key.decode('utf-8')
+            
+            user_data = run_async(redis_client.get(key))
+            if user_data:
+                try:
+                    user = json.loads(user_data.decode('utf-8') if isinstance(user_data, bytes) else user_data)
+                    last_active = user.get('last_active', 0)
+                    
+                    if last_active < cutoff_time:
+                        user_id = key.split(':')[1]
+                        # Delete all user data (reuse the delete_user_data logic)
+                        deleted_keys = []
+                        
+                        for data_key in [f"user:{user_id}", f"state:{user_id}", f"preferences:{user_id}", 
+                                        f"media_preferences:{user_id}", f"pair:{user_id}", 
+                                        f"chat:activity:{user_id}", f"rating:{user_id}", 
+                                        f"feedback:{user_id}", f"ban:{user_id}", f"warnings:{user_id}"]:
+                            if run_async(redis_client.exists(data_key)):
+                                run_async(redis_client.delete(data_key))
+                                deleted_keys.append(data_key)
+                        
+                        deleted_users.append(user_id)
+                except:
+                    continue
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="inactive_users_deleted",
+                details=f"Deleted {len(deleted_users)} users inactive for {days}+ days"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Deleted {len(deleted_users)} inactive users",
+            "deleted_count": len(deleted_users),
+            "user_ids": deleted_users[:50]  # Return first 50 for reference
+        })
+        
+    except Exception as e:
+        logger.error("delete_inactive_users_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-banned-users', methods=['POST'])
+@require_auth
+def delete_banned_users_list():
+    """Delete all banned users and their ban records."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get all banned users
+        banned_users = run_async(redis_client.smembers("banned_users"))
+        deleted_count = 0
+        
+        for user_id_bytes in banned_users:
+            user_id = user_id_bytes.decode('utf-8') if isinstance(user_id_bytes, bytes) else str(user_id_bytes)
+            
+            # Delete ban record
+            ban_key = f"ban:{user_id}"
+            if run_async(redis_client.exists(ban_key)):
+                run_async(redis_client.delete(ban_key))
+                deleted_count += 1
+        
+        # Clear the banned users set
+        run_async(redis_client.delete("banned_users"))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="banned_users_list_cleared",
+                details=f"Cleared entire banned users list ({deleted_count} users)"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Deleted all banned users",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("delete_banned_users_list_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-warned-users', methods=['POST'])
+@require_auth
+def delete_warned_users_list():
+    """Delete all warned users and their warning records."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get all warning keys
+        warning_keys = run_async(redis_client.keys("warnings:*"))
+        deleted_count = len(warning_keys)
+        
+        # Delete all warning records
+        if warning_keys:
+            run_async(redis_client.delete(*warning_keys))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="warned_users_list_cleared",
+                details=f"Cleared entire warned users list ({deleted_count} users)"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Deleted all warned users",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("delete_warned_users_list_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-single-ban', methods=['POST'])
+@require_auth
+def delete_single_ban():
+    """Remove a specific user from banned list."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        user_id = int(user_id)
+        
+        # Delete ban record
+        ban_key = f"ban:{user_id}"
+        ban_deleted = run_async(redis_client.delete(ban_key))
+        
+        # Remove from banned users set
+        run_async(redis_client.srem("banned_users", user_id))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="ban_record_deleted",
+                target_user_id=user_id,
+                details=f"Deleted ban record for user {user_id}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Ban record deleted for user {user_id}",
+            "deleted": bool(ban_deleted)
+        })
+        
+    except Exception as e:
+        logger.error("delete_single_ban_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-single-warning', methods=['POST'])
+@require_auth
+def delete_single_warning():
+    """Remove warnings for a specific user."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        user_id = int(user_id)
+        
+        # Delete warning record
+        warning_key = f"warnings:{user_id}"
+        warning_deleted = run_async(redis_client.delete(warning_key))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="warning_record_deleted",
+                target_user_id=user_id,
+                details=f"Deleted warning record for user {user_id}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Warning record deleted for user {user_id}",
+            "deleted": bool(warning_deleted)
+        })
+        
+    except Exception as e:
+        logger.error("delete_single_warning_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-all-reports', methods=['POST'])
+@require_auth
+def delete_all_reports():
+    """Delete all user reports."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get all report keys
+        report_keys = run_async(redis_client.keys("report:*"))
+        deleted_count = 0
+        
+        # Delete all report keys
+        for key in report_keys:
+            if isinstance(key, bytes):
+                key = key.decode('utf-8')
+            run_async(redis_client.delete(key))
+            deleted_count += 1
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="all_reports_deleted",
+                details=f"Deleted all user reports ({deleted_count} reports)"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Deleted all reports",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("delete_all_reports_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/delete-single-report', methods=['POST'])
+@require_auth
+def delete_single_report():
+    """Delete a specific user's report."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        user_id = int(user_id)
+        
+        # Delete report record
+        report_key = f"report:{user_id}"
+        report_deleted = run_async(redis_client.delete(report_key))
+        
+        # Delete individual report status keys for this user
+        individual_keys = run_async(redis_client.keys(f"report:individual_*:{user_id}:*"))
+        individual_keys.extend(run_async(redis_client.keys(f"report:individual_*:*:{user_id}")))
+        
+        if individual_keys:
+            run_async(redis_client.delete(*individual_keys))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="report_deleted",
+                target_user_id=user_id,
+                details=f"Deleted report for user {user_id}"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Report deleted for user {user_id}",
+            "deleted": bool(report_deleted)
+        })
+        
+    except Exception as e:
+        logger.error("delete_single_report_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/clear-blocked-media', methods=['POST'])
+@require_auth
+def clear_blocked_media():
+    """Clear all blocked media types."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get all blocked media keys
+        blocked_keys = run_async(redis_client.keys("blocked_media:*"))
+        deleted_count = len(blocked_keys)
+        
+        # Delete all blocked media keys
+        if blocked_keys:
+            run_async(redis_client.delete(*blocked_keys))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="blocked_media_cleared",
+                details=f"Cleared all blocked media types ({deleted_count} types)"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Cleared all blocked media types",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("clear_blocked_media_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/clear-bad-words', methods=['POST'])
+@require_auth
+def clear_bad_words():
+    """Clear all bad words."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get bad words set
+        bad_words = run_async(redis_client.smembers("bad_words"))
+        deleted_count = len(bad_words)
+        
+        # Clear the bad words set
+        run_async(redis_client.delete("bad_words"))
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="bad_words_cleared",
+                details=f"Cleared all bad words ({deleted_count} words)"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Cleared all bad words",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("clear_bad_words_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/clear-moderation-logs', methods=['POST'])
+@require_auth
+def clear_moderation_logs():
+    """Clear all moderation logs."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        days_to_keep = data.get('days_to_keep', 0)  # Default: delete all
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        # Get moderation log list
+        all_logs = run_async(redis_client.lrange("moderation_logs", 0, -1))
+        deleted_count = 0
+        
+        if days_to_keep > 0:
+            # Keep recent logs
+            cutoff_time = int(time.time()) - (days_to_keep * 86400)
+            logs_to_keep = []
+            
+            for log_data in all_logs:
+                try:
+                    log = json.loads(log_data.decode('utf-8') if isinstance(log_data, bytes) else log_data)
+                    if log.get('timestamp', 0) >= cutoff_time:
+                        logs_to_keep.append(log_data)
+                    else:
+                        deleted_count += 1
+                except:
+                    continue
+            
+            # Clear and repopulate with logs to keep
+            run_async(redis_client.delete("moderation_logs"))
+            if logs_to_keep:
+                run_async(redis_client.rpush("moderation_logs", *logs_to_keep))
+        else:
+            # Delete all logs
+            deleted_count = len(all_logs)
+            run_async(redis_client.delete("moderation_logs"))
+        
+        # Log this action (will be added to logs)
+        if report_manager:
+            if days_to_keep > 0:
+                details = f"Cleared moderation logs older than {days_to_keep} days ({deleted_count} logs)"
+            else:
+                details = f"Cleared all moderation logs ({deleted_count} logs)"
+            
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="moderation_logs_cleared",
+                details=details
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Cleared moderation logs",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("clear_moderation_logs_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/clear-cache', methods=['POST'])
+@require_auth
+def clear_cache():
+    """Clear temporary cache data."""
+    try:
+        data = request.get_json()
+        admin_id = parse_admin_id(data.get('admin_id'))
+        
+        redis_client, _, _, report_manager, _, _ = get_thread_services()
+        
+        deleted_count = 0
+        
+        # Clear activity timestamps (can be rebuilt)
+        activity_keys = run_async(redis_client.keys("chat:activity:*"))
+        if activity_keys:
+            run_async(redis_client.delete(*activity_keys))
+            deleted_count += len(activity_keys)
+        
+        # Clear temporary session data
+        session_keys = run_async(redis_client.keys("session:*"))
+        if session_keys:
+            run_async(redis_client.delete(*session_keys))
+            deleted_count += len(session_keys)
+        
+        # Log the action
+        if report_manager:
+            run_async(report_manager.log_moderation_action(
+                admin_id=admin_id,
+                action="cache_cleared",
+                details=f"Cleared {deleted_count} cache entries"
+            ))
+        
+        return jsonify({
+            "success": True,
+            "message": f"Cleared {deleted_count} cache entries",
+            "deleted_count": deleted_count
+        })
+        
+    except Exception as e:
+        logger.error("clear_cache_error", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/data/stats', methods=['GET'])
+@require_auth
+def get_data_stats():
+    """Get statistics about data in Redis."""
+    try:
+        redis_client, _, admin_manager, _, _, _ = get_thread_services()
+        
+        # Get user count from the dedicated set
+        users_count = run_async(redis_client.scard("bot:all_users")) if run_async(redis_client.exists("bot:all_users")) else 0
+        
+        # Count active chats by counting pair keys and dividing by 2 (each chat has 2 pair keys)
+        pair_keys = run_async(redis_client.keys("pair:*"))
+        active_chats = len(pair_keys) // 2 if pair_keys else 0
+        
+        # Count different types of keys
+        stats = {
+            "users": users_count,
+            "profiles": len(run_async(redis_client.keys("profile:*"))),
+            "preferences": len(run_async(redis_client.keys("preferences:*"))),
+            "active_chats": active_chats,  # Divided by 2 since each chat creates 2 pair keys
+            "reports": len(run_async(redis_client.keys("report:*"))),
+            "bans": len(run_async(redis_client.keys("ban:*"))),
+            "warnings": len(run_async(redis_client.keys("warnings:*"))),
+            "ratings": len(run_async(redis_client.keys("rating:*"))),
+            "feedbacks": len(run_async(redis_client.keys("feedback:*"))),  # Temporary - 1hr expiry
+            "online_users": len(run_async(redis_client.keys("online:*"))),  # Currently online users
+            "typing_users": len(run_async(redis_client.keys("typing:*"))),  # Currently typing
+            "queue_size": run_async(redis_client.llen("queue:waiting")),
+            "total_keys": len(run_async(redis_client.keys("*")))
+        }
+        
+        return jsonify({
+            "success": True,
+            "stats": stats
+        })
+        
+    except Exception as e:
+        logger.error("get_data_stats_error", error=str(e))
         return jsonify({"error": str(e)}), 500
 
 

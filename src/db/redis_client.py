@@ -208,6 +208,14 @@ class RedisClient:
             logger.error("redis_srem_error", key=key, error=str(e))
             raise
     
+    async def scard(self, key: str) -> int:
+        """Get the number of members in a set."""
+        try:
+            return await self.client.scard(key)
+        except RedisError as e:
+            logger.error("redis_scard_error", key=key, error=str(e))
+            raise
+    
     async def zadd(self, key: str, mapping: dict, nx: bool = False, gt: bool = False) -> int:
         """Add members to a sorted set with scores."""
         try:
@@ -230,6 +238,14 @@ class RedisClient:
             return await self.client.zcard(key)
         except RedisError as e:
             logger.error("redis_zcard_error", key=key, error=str(e))
+            raise
+    
+    async def zrem(self, key: str, *members: str) -> int:
+        """Remove members from a sorted set."""
+        try:
+            return await self.client.zrem(key, *members)
+        except RedisError as e:
+            logger.error("redis_zrem_error", key=key, error=str(e))
             raise
 
 

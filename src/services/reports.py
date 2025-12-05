@@ -638,8 +638,10 @@ class ReportManager:
             report_keys = await self.redis.keys("stats:*:reports")
             total_reported_users = len(report_keys)
             
-            # Calculate total reports by summing individual report counts
+            # Calculate total reports and pending report entries
             total_reports = 0
+            pending_report_entries = 0
+            
             for key_bytes in report_keys:
                 try:
                     key = key_bytes.decode('utf-8') if isinstance(key_bytes, bytes) else key_bytes
@@ -649,16 +651,64 @@ class ReportManager:
                     count_key = f"stats:{user_id}:report_count"
                     count_bytes = await self.redis.get(count_key)
                     if count_bytes:
-                        total_reports += int(count_bytes)
+                        user_report_count = int(count_bytes)
+                        total_reports += user_report_count
+                        
+                        # Check if this user's reports are still pending
+                        # Get all reports for this user
+                        reports_key = f"stats:{user_id}:reports"
+                        reports_bytes = await self.redis.lrange(reports_key, 0, -1)  # Get all reports
+                        
+                        # Get latest report timestamp to check approval/rejection status
+                        latest_report_timestamp = 0
+                        if reports_bytes:
+                            try:
+                                report_data = json.loads(
+                                    reports_bytes[0].decode('utf-8') if isinstance(reports_bytes[0], bytes) 
+                                    else reports_bytes[0]
+                                )
+                                latest_report_timestamp = report_data.get('timestamp', 0)
+                            except:
+                                pass
+                        
+                        # Check approval/rejection status
+                        is_processed = False
+                        
+                        # Check approvals
+                        approved_key = f"report:approvals:{user_id}"
+                        approved_data = await self.redis.lrange(approved_key, 0, 0)
+                        if approved_data:
+                            try:
+                                approval_info = json.loads(
+                                    approved_data[0].decode('utf-8') if isinstance(approved_data[0], bytes) 
+                                    else approved_data[0]
+                                )
+                                if approval_info.get('approved_at', 0) > latest_report_timestamp:
+                                    is_processed = True
+                            except:
+                                pass
+                        
+                        # Check rejections (takes precedence if more recent)
+                        rejected_key = f"report:rejections:{user_id}"
+                        rejected_data = await self.redis.lrange(rejected_key, 0, 0)
+                        if rejected_data:
+                            try:
+                                rejection_info = json.loads(
+                                    rejected_data[0].decode('utf-8') if isinstance(rejected_data[0], bytes) 
+                                    else rejected_data[0]
+                                )
+                                if rejection_info.get('rejected_at', 0) > latest_report_timestamp:
+                                    is_processed = True
+                            except:
+                                pass
+                        
+                        # If not processed, count all report entries as pending
+                        if not is_processed:
+                            pending_report_entries += user_report_count
+                            
                 except Exception as e:
                     logger.debug("count_reports_error", key=key, error=str(e))
                     continue
-            
-            # Calculate pending reports (not approved or rejected individually)
-            approval_keys = await self.redis.keys("report:individual_approval:*")
-            rejection_keys = await self.redis.keys("report:individual_rejection:*")
-            processed_reports = len(approval_keys) + len(rejection_keys)
-            pending_reports = max(0, total_reports - processed_reports)
             
             # Get frozen users count
             frozen_users = await self.get_frozen_users()
@@ -672,7 +722,7 @@ class ReportManager:
             return {
                 "total_reports": total_reports,
                 "reported_users": total_reported_users,
-                "pending_reports": pending_reports,
+                "pending_reports": pending_report_entries,
                 "frozen_users_count": len(frozen_users),
                 "blocked_media_count": len(blocked_media),
                 "bad_words_count": len(bad_words)
