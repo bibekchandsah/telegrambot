@@ -187,6 +187,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             KeyboardButton("🆘 Help"),
+            KeyboardButton("📞 Support"),
         ],
     ]
     reply_markup = ReplyKeyboardMarkup(
@@ -195,6 +196,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         one_time_keyboard=False,
         input_field_placeholder="Choose an option..."
     )
+
     
     await update.message.reply_text(
         welcome_message,
@@ -247,6 +249,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/stop - End chat\n"
         "/next - Skip to next\n"
         "/help - Show this message\n"
+        "/support - Get support links\n"
         "/report - Report abuse\n\n"
         "⚠️ **Rules:**\n"
         "• Be respectful and kind\n"
@@ -267,6 +270,31 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     logger.info("help_command", user_id=update.effective_user.id)
+
+
+async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /support command - show support links and resources."""
+    support_message = (
+        "📞 **Support & Resources**\n\n"
+        "Need help? Here's how you can reach us:\n\n"
+        "📢 **Official Channel:**\n"
+        "https://t.me/meetgrid\n"
+        "Stay updated with news and announcements\n\n"
+        "👥 **Community Group:**\n"
+        "https://t.me/meetgridgroup\n"
+        "Chat with other users and get help\n\n"
+        "📝 **Feedback Form:**\n"
+        "https://forms.gle/EZgHdo1bZoXZALUZA\n"
+        "Share your feedback and suggestions\n\n"
+        "💡 For quick help, use /help to see all commands."
+    )
+    
+    await update.message.reply_text(
+        support_message,
+        parse_mode="Markdown",
+    )
+    
+    logger.info("support_command", user_id=update.effective_user.id)
 
 
 @rate_limit(max_calls=5, period=60)
@@ -4523,17 +4551,45 @@ async def matchstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def menu_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle inline keyboard button clicks from main menu (placeholder for future use)."""
+    """Handle inline keyboard button clicks from main menu."""
     query = update.callback_query
     await query.answer()
     
-    # This callback handler is registered but not currently used
-    # since we removed the Settings button from the keyboard.
-    # Keep it for future inline button implementations.
-    await query.message.reply_text(
-        "⚠️ This feature is currently unavailable.",
-        parse_mode="Markdown"
-    )
+    callback_data = query.data
+    
+    if callback_data == "action_profile":
+        await profile_command(update, context)
+    elif callback_data == "action_preferences":
+        await preferences_command(update, context)
+    elif callback_data == "action_media":
+        await mediasettings_command(update, context)
+    elif callback_data == "action_rating":
+        await rating_command(update, context)
+    elif callback_data == "action_support":
+        # Show support information
+        support_message = (
+            "📞 **Support & Resources**\n\n"
+            "Need help? Here's how you can reach us:\n\n"
+            "📢 **Official Channel:**\n"
+            "https://t.me/meetgrid\n"
+            "Stay updated with news and announcements\n\n"
+            "👥 **Community Group:**\n"
+            "https://t.me/meetgridgroup\n"
+            "Chat with other users and get help\n\n"
+            "📝 **Feedback Form:**\n"
+            "https://forms.gle/EZgHdo1bZoXZALUZA\n"
+            "Share your feedback and suggestions\n\n"
+            "💡 For quick help, use /help to see all commands."
+        )
+        await query.message.reply_text(
+            support_message,
+            parse_mode="Markdown",
+        )
+    else:
+        await query.message.reply_text(
+            "⚠️ This feature is currently unavailable.",
+            parse_mode="Markdown"
+        )
 
 
 

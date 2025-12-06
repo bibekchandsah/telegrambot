@@ -23,6 +23,7 @@ from src.services.reports import ReportManager
 from src.handlers.commands import (
     start_command,
     help_command,
+    support_command,
     chat_command,
     stop_command,
     next_command,
@@ -439,6 +440,7 @@ def main():
         # Register command handlers
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("support", support_command))
         application.add_handler(CommandHandler("chat", chat_command))
         application.add_handler(CommandHandler("stop", stop_command))
         application.add_handler(CommandHandler("next", next_command))

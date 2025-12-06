@@ -38,6 +38,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from src.handlers.commands import (
             chat_command,
             help_command,
+            support_command,
             report_command,
             next_command,
             profile_command,
@@ -57,6 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("🎯 Preferences", callback_data="action_preferences")],
                 [InlineKeyboardButton("📸 Media Settings", callback_data="action_media")],
                 [InlineKeyboardButton("⭐ Rating", callback_data="action_rating")],
+                [InlineKeyboardButton("📞 Support", callback_data="action_support")],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
@@ -71,6 +73,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await report_command(update, context)
         elif text in ["🆘 Help", "❓ Help"]:
             return await help_command(update, context)
+        elif text in ["📞 Support"]:
+            return await support_command(update, context)
     
     # Check maintenance mode (admins can still send messages)
     if redis_client:

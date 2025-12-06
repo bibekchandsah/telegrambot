@@ -161,7 +161,23 @@ Profile contains:
 
 download the database data and allow admin to clean the database
 
+Find Friends & Partners Anonymously with MeetGrid 🎭
+bot: https://t.me/meetgrid_bot
+website: https://meetgrid.netlify.app/
+Join channel for latest updates: https://t.me/meetgrid
+Join group for your queries and support: https://t.me/meetgridgroup
+feedback form: https://forms.gle/EZgHdo1bZoXZALUZA
 
+🎭 MeetGrid - Anonymous Random Chat
+
+Connect with strangers worldwide! 
+✨ Random matching with safety controls
+💬 Text, voice, photos & videos supported
+🎯 Filter by gender & country preferences
+⭐ Rate partner conversations
+🛡 Report system for safety
+
+Start chatting anonymously now!
 
 
 
